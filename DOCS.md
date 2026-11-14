@@ -5,7 +5,8 @@ AI agents interact with your Grocy ERP instance via natural language.
 
 ## Prerequisites
 
-- A running **Grocy** instance (v4.0+) — either the `grocy` add-on or a standalone
+- A running **Grocy** instance (v4.0+) — either the community
+  [Grocy add-on](https://github.com/hassio-addons/addon-grocy) or a standalone
   Docker deployment
 - An API key generated in Grocy: **Settings → Manage API keys → Add**
 
@@ -13,9 +14,14 @@ AI agents interact with your Grocy ERP instance via natural language.
 
 | Option              | Required | Description                                                     |
 |---------------------|----------|-----------------------------------------------------------------|
-| `grocy_url`         | ✅       | Base URL of your Grocy instance, e.g. `http://homeassistant.local:9283` |
+| `grocy_url`         | ✅       | Base URL of your Grocy instance, e.g. `http://a0d7b954-grocy` |
 | `grocy_api_token`   | ✅       | API key from Grocy Settings → Manage API keys                   |
 | `log_level`         | –        | Log verbosity: `debug`, `info`, `warning`, `error` (default `info`) |
+
+With the community Grocy add-on, use its internal hostname `http://a0d7b954-grocy`
+(shown on the add-on's info page). A domain that only your local DNS knows fails
+with `Name does not resolve`, because Home Assistant's internal DNS cannot resolve
+it. Check the connection at `http://<your-ha-ip>:8001/health`.
 
 ## Connecting an MCP client
 

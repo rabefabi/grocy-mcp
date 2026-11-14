@@ -26,7 +26,7 @@ Tools accept human-readable names and resolve them to Grocy IDs. Ambiguous match
 
 | Option            | Required | Description                                                          |
 |-------------------|----------|----------------------------------------------------------------------|
-| `grocy_url`       | yes      | Base URL of your Grocy instance, e.g. `http://homeassistant.local:9283` |
+| `grocy_url`       | yes      | Base URL of your Grocy instance, e.g. `http://a0d7b954-grocy` ([DOCS.md](DOCS.md#configuration)) |
 | `grocy_api_token` | yes      | API key from Grocy (**Settings → Manage API keys**)                  |
 | `log_level`       | no       | `debug`, `info`, `warning`, `error` (default `info`)                 |
 
