@@ -67,7 +67,13 @@ Decided in [Names, IDs and response size](https://github.com/rabefabi/grocy-mcp/
 1. **Names next to IDs** — every ID in a read response that points at another
    entity gets a flat name field beside it: `product_name`, `unit_name`
    (the unit's singular `name`), `location_name`, `recipe_name`. The IDs stay
-   (property 3 still holds). Applies to all `get_*` tools.
+   (property 3 still holds). Applies to all `get_*` tools. Where one entity
+   carries several IDs of the same kind, the name field follows the ID's role:
+   `get_products` returns `qu_stock_name`, `qu_purchase_name` and
+   `qu_consume_name` for `qu_id_stock`, `qu_id_purchase` and `qu_id_consume`
+   (the `create_product` parameter names), and `parent_product_name` for
+   `parent_product_id` (decided while implementing
+   [#12](https://github.com/rabefabi/grocy-mcp/issues/12)).
 2. **Flat stock rows** — `get_stock` returns one flat row per product on every
    path, including the location filter, where the server sums the stock entries
    per product (earliest best-before date). The nested `product` sub-object
