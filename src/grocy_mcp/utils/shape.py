@@ -20,6 +20,11 @@ from __future__ import annotations
 from typing import Any
 
 
+def names_by_id(entities: list[dict[str, Any]]) -> dict[Any, str | None]:
+    """Map entity IDs to names, for adding name fields next to foreign IDs."""
+    return {entity["id"]: entity.get("name") for entity in entities}
+
+
 def shape_response(
     data: Any,
     keep: set[str],

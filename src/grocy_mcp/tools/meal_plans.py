@@ -13,12 +13,13 @@ from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
-from ..utils.shape import shape_response
+from ..utils.shape import names_by_id, shape_response
 
 _MEAL_PLAN_KEEP = {
     "id",
     "day",
     "recipe_id",
+    "product_id",
     "type",
     "recipe_servings",   # actual Grocy API field name (not "servings")
     "note",
@@ -45,7 +46,10 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             to_date: End date (YYYY-MM-DD format). Defaults to today
 
         Returns:
-            List of meal plan entries with date, recipe, servings, meal type
+            List of meal plan entries with id, day, type, recipe_id,
+            recipe_name, recipe_servings, product_id, product_name, and note.
+            recipe_name and product_name are null when the entry has no
+            recipe or product.
         """
         if not from_date:
             from_date = datetime.now().strftime("%Y-%m-%d")
@@ -58,7 +62,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             for entry in entries
             if from_date <= str(entry.get("day", "")) <= to_date
         ]
-        return shape_response(filtered, _MEAL_PLAN_KEEP)
+        shaped = shape_response(filtered, _MEAL_PLAN_KEEP)
+        if not shaped:
+            return shaped
+        recipe_names = names_by_id(client.get("/api/objects/recipes"))
+        product_names = names_by_id(client.get("/api/objects/products"))
+        for entry in shaped:
+            entry["recipe_name"] = recipe_names.get(entry.get("recipe_id"))
+            entry["product_name"] = product_names.get(entry.get("product_id"))
+        return shaped
 
     @mcp.tool(annotations=WRITE)
     def create_meal_plan_entry(

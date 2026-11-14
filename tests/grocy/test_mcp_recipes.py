@@ -101,6 +101,61 @@ class TestMealPlanShape:
                     pass  # Best-effort cleanup; entry may already be gone
 
 
+    @pytest.mark.asyncio
+    async def test_meal_plan_returns_recipe_and_product_names(
+        self, call_tool, api_post, api_delete, create_product_api, name_factory
+    ):
+        recipe_name = name_factory("plan-recipe")
+        product_name = name_factory("plan-product")
+        test_date = "2099-03-01"
+        created_ids: list[str] = []
+        try:
+            recipe = api_post(
+                "/api/objects/recipes", {"name": recipe_name, "base_servings": 1}
+            )
+            recipe_id = int(recipe["created_object_id"])
+            created_ids.append(f"/api/objects/recipes/{recipe_id}")
+            product_id = int(create_product_api(product_name)["id"])
+            created_ids.append(f"/api/objects/products/{product_id}")
+
+            recipe_entry = api_post(
+                "/api/objects/meal_plan",
+                {"day": test_date, "type": "recipe", "recipe_id": recipe_id},
+            )
+            created_ids.insert(
+                0, f"/api/objects/meal_plan/{recipe_entry['created_object_id']}"
+            )
+            product_entry = api_post(
+                "/api/objects/meal_plan",
+                {
+                    "day": test_date,
+                    "type": "product",
+                    "product_id": product_id,
+                    "product_amount": 1,
+                },
+            )
+            created_ids.insert(
+                0, f"/api/objects/meal_plan/{product_entry['created_object_id']}"
+            )
+
+            result = await call_tool(
+                "get_meal_plan", from_date=test_date, to_date=test_date
+            )
+            by_id = {int(e["id"]): e for e in result}
+
+            planned_recipe = by_id[int(recipe_entry["created_object_id"])]
+            assert planned_recipe["recipe_id"] == recipe_id
+            assert planned_recipe["recipe_name"] == recipe_name
+
+            planned_product = by_id[int(product_entry["created_object_id"])]
+            assert planned_product["product_id"] == product_id
+            assert planned_product["product_name"] == product_name
+            assert planned_product["recipe_name"] is None
+        finally:
+            for path in created_ids:
+                api_delete(path)
+
+
 class TestProductShape:
     @pytest.mark.asyncio
     async def test_products_excludes_noise(self, call_tool):

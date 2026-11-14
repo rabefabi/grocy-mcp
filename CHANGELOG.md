@@ -7,6 +7,10 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 ## Unreleased
 
+### Added
+
+- `get_meal_plan` returns the recipe name and product name next to their IDs.
+
 ## 0.2.0 – 2026-11-14
 
 ### Added

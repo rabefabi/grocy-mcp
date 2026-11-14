@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
-from ..utils.shape import shape_response
+from ..utils.shape import names_by_id, shape_response
 
 _SHOPPING_LIST_KEEP = {
     "id",
@@ -31,10 +31,6 @@ if TYPE_CHECKING:
 log = logging.getLogger("grocy_mcp")
 
 
-def _names_by_id(entities: list[dict[str, Any]]) -> dict[Any, str]:
-    return {entity["id"]: entity["name"] for entity in entities}
-
-
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register shopping list tools."""
 
@@ -52,8 +48,8 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         items = shape_response(
             client.get("/api/objects/shopping_list"), _SHOPPING_LIST_KEEP
         )
-        product_names = _names_by_id(client.get("/api/objects/products"))
-        unit_names = _names_by_id(client.get("/api/objects/quantity_units"))
+        product_names = names_by_id(client.get("/api/objects/products"))
+        unit_names = names_by_id(client.get("/api/objects/quantity_units"))
         for item in items:
             item["product_name"] = product_names.get(item.get("product_id"))
             item["unit_name"] = unit_names.get(item.get("qu_id"))

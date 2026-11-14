@@ -29,7 +29,7 @@ Load the **grocy-household-profile** skill for: dietary settings and any custom 
 
 ### Meal Plan Queries
 
-- `get_meal_plan(from_date=..., to_date=...)` — get meal plan entries for a date range. Returns recipes, dates, and types.
+- `get_meal_plan(from_date=..., to_date=...)` — get meal plan entries for a date range. Each entry carries `day`, `type`, `recipe_id` with `recipe_name`, and `product_id` with `product_name`, so one call tells you what is planned.
 
 ### Meal Plan Operations
 
