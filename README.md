@@ -46,7 +46,7 @@ The server listens on port **8001**.
 ```bash
 cp .env.example .env
 uv sync
-uv run python -m grocy_mcp     # or: just grocy-mcp-run
+just grocy-mcp-run staging     # runs against the Grocy in .env
 ```
 
 | Variable          | Required | Description                                          |

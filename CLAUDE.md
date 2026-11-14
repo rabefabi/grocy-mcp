@@ -7,6 +7,16 @@ An MCP server wrapping the Grocy REST API as tools for AI agents. Ships as a Hom
 - `tests/grocy/` — integration tests against a real Grocy instance; they call tools through the MCP server. `just grocy-up && just grocy-token && just grocy-seed` prepares the instance, `just grocy-test` runs them.
 - `docs/adr/` — architecture decisions. Read the relevant ADR before changing response shaping (055) or unit handling (057).
 
+## Environments
+
+| | Client | MCP server | Grocy | Purpose |
+|---|---|---|---|---|
+| Dev | Claude Code | local, `just grocy-mcp-run` | local test instance (`.env.grocy.test`) | Claude develops and verifies on its own |
+| Staging | Claude Code | local, `just grocy-mcp-run staging` | production (`.env`) | the user tests new features by hand |
+| Prod | Hermes ("Karl Koch") | Home Assistant add-on | production | everyday use |
+
+Claude works in Dev. Run the server against production Grocy only when the user asks for it.
+
 ## Conventions
 
 - **Name-based resolution**: tools accept human-readable names (products, locations, units, recipes) and resolve them to Grocy IDs internally.

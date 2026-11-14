@@ -2,7 +2,7 @@
 #
 # Usage:
 #   just                Show available recipes (same as just --list)
-#   just grocy-mcp-run  Launch the MCP server locally against the Grocy instance in .env
+#   just grocy-mcp-run [dev|staging]  Launch the MCP server locally (see Environments in CLAUDE.md)
 #
 #   just grocy-up       Start the Grocy test instance
 #   just grocy-down     Stop the Grocy test instance (removes containers + volumes)
@@ -18,7 +18,6 @@
 #   just grocy-seed
 #   just grocy-test
 
-env_prod := ".env"
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 green  := '\033[0;32m'
@@ -31,32 +30,38 @@ nc     := '\033[0m'
 default:
     @just --list
 
-# Launch Grocy MCP server locally with production .env
-grocy-mcp-run:
+# Launch the MCP server locally: dev → local Grocy (.env.grocy.test), staging → production Grocy (.env)
+grocy-mcp-run env="dev":
     #!/usr/bin/env bash
     set -euo pipefail
-    
-    if [[ ! -f "{{env_prod}}" ]]; then
-        printf '{{red}}[grocy-mcp]{{nc}} {{env_prod}} not found. Create it first.\n' >&2
+
+    case "{{env}}" in
+        dev)     env_file=".env.grocy.test" ;;
+        staging) env_file=".env" ;;
+        *) printf '{{red}}[grocy-mcp]{{nc}} Unknown env "{{env}}", use dev or staging\n' >&2; exit 1 ;;
+    esac
+
+    if [[ ! -f "$env_file" ]]; then
+        printf '{{red}}[grocy-mcp]{{nc}} %s not found. Create it first.\n' "$env_file" >&2
         exit 1
     fi
     
-    # Load and export all variables from .env
+    # Load and export all variables from the env file
     set -a
-    source "{{env_prod}}"
+    source "$env_file"
     set +a
     
     # Check for required environment variables
     if [[ -z "${GROCY_URL:-}" ]]; then
-        printf '{{red}}[grocy-mcp]{{nc}} GROCY_URL not set in {{env_prod}}\n' >&2
+        printf '{{red}}[grocy-mcp]{{nc}} GROCY_URL not set in %s\n' "$env_file" >&2
         exit 1
     fi
     if [[ -z "${GROCY_API_TOKEN:-}" ]]; then
-        printf '{{red}}[grocy-mcp]{{nc}} GROCY_API_TOKEN not set in {{env_prod}}\n' >&2
+        printf '{{red}}[grocy-mcp]{{nc}} GROCY_API_TOKEN not set in %s\n' "$env_file" >&2
         exit 1
     fi
     
-    printf '{{green}}[grocy-mcp]{{nc}} Starting Grocy MCP server...\n'
+    printf '{{green}}[grocy-mcp]{{nc}} Starting Grocy MCP server ({{env}})...\n'
     printf '{{cyan}}[grocy-mcp]{{nc}} Grocy URL: %s\n' "$GROCY_URL"
     printf '{{cyan}}[grocy-mcp]{{nc}} MCP Port: %s\n' "${MCP_PORT:-8000}"
     
@@ -72,7 +77,7 @@ grocy-mcp-run:
     
     if ps -p $pid > /dev/null 2>&1; then
         printf '{{green}}[grocy-mcp]{{nc}} Server started (PID: %s)\n' "$pid"
-        printf '{{green}}[grocy-mcp]{{nc}} MCP endpoint: http://localhost:%s/\n' "${MCP_PORT:-8000}"
+        printf '{{green}}[grocy-mcp]{{nc}} MCP endpoint: http://localhost:%s/mcp\n' "${MCP_PORT:-8000}"
         printf '{{cyan}}[grocy-mcp]{{nc}} Logs: tail -f /tmp/grocy_mcp.log\n'
         printf '{{cyan}}[grocy-mcp]{{nc}} Stop: pkill -f grocy_mcp\n'
     else
@@ -179,41 +184,14 @@ grocy-token:
         }
     fi
 
-    # Generate or retrieve API key using SQL
-    raw_output=$(docker exec grocy-test sh -c '
-        DB_PATH="/config/data/grocy.db"
-        
-        # Check if an API key already exists for user 1 (admin)
-        existing_key=$(sqlite3 "$DB_PATH" "SELECT api_key FROM api_keys WHERE user_id = 1 LIMIT 1;" 2>/dev/null || echo "")
-        
-        if [ -n "$existing_key" ]; then
-            echo "INFO: Using existing API key for user 1" >&2
-            echo "$existing_key"
-        else
-            # Generate a new API key (64-character hex string)
-            new_key=$(sqlite3 "$DB_PATH" "SELECT lower(hex(randomblob(32)));" | head -n1)
-            expires=$(date -d "+365 days" "+%Y-%m-%d %H:%M:%S" 2>/dev/null || date -v +365d "+%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "2099-12-31 00:00:00")
-            
-            sqlite3 "$DB_PATH" "INSERT INTO api_keys (api_key, user_id, expires, key_type) VALUES (\"$new_key\", 1, \"$expires\", \"special-purpose-api-key\");"
-            
-            echo "INFO: Generated new API key for user 1" >&2
-            echo "$new_key"
-        fi
-    ' 2>&1)
-
-    # Separate INFO lines from the actual token
-    info_lines=$(echo "$raw_output" | grep "^INFO:")
-    token=$(echo "$raw_output" | grep -v "^INFO:" | grep -v '^$' | tail -1)
-
-    if [[ -z "$token" ]] || [[ "$token" == ERROR* ]]; then
-        printf '{{red}}[grocy-test]{{nc}} Failed to retrieve token. Output:\n' >&2
-        printf '{{red}}[grocy-test]{{nc}} %s\n' "$raw_output" >&2
-        echo ""
-        printf '{{yellow}}[grocy-test]{{nc}} Manual fallback:\n' >&2
-        printf '{{yellow}}[grocy-test]{{nc}}   1. Log in to http://localhost:9283 (admin/admin)\n' >&2
-        printf '{{yellow}}[grocy-test]{{nc}}   2. Go to Manage API keys → Create new key\n' >&2
-        printf '{{yellow}}[grocy-test]{{nc}}   3. Copy the key to .env.grocy.test as GROCY_API_TOKEN=<key>\n' >&2
-        exit 1
+    # Reuse a valid API key for the admin user (id 1) or insert a new one.
+    # The REST API only accepts keys of type 'default'.
+    db="/config/data/grocy.db"
+    sql() { docker exec grocy-test sqlite3 "$db" "$1"; }
+    token=$(sql "SELECT api_key FROM api_keys WHERE user_id = 1 AND key_type = 'default' AND expires > datetime('now') LIMIT 1;")
+    if [[ -z "$token" ]]; then
+        token=$(sql "SELECT lower(hex(randomblob(32)));")
+        sql "INSERT INTO api_keys (api_key, user_id, expires, key_type) VALUES ('$token', 1, datetime('now', '+365 days'), 'default');"
     fi
 
     printf '{{green}}[grocy-test]{{nc}} Token retrieved successfully.\n'
@@ -228,7 +206,6 @@ grocy-token:
         echo "GROCY_URL=${url}"
         echo "GROCY_API_TOKEN=${token}"
         echo "LOG_LEVEL=debug"
-        echo "MCP_PORT=8001"
     } > "{{env_grocy_test}}"
 
     printf '{{green}}[grocy-test]{{nc}} Token written to: {{env_grocy_test}}\n'

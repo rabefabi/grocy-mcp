@@ -63,6 +63,7 @@ class GrocyClient:
 
 def seed_data(client: GrocyClient):
     """Seed representative test data."""
+    client.get("/system/info")  # fail fast on an unreachable instance or a rejected token
     print("Seeding Grocy instance with test data...")
 
     # ── Quantity units ────────────────────────────────────────────────────
