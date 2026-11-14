@@ -68,26 +68,25 @@ _UNIT_ALIASES = {
 }
 
 
-def _resolve_recipe_id(
+def _resolve_recipe(
     client: GrocyClient, recipe_id: int | None, recipe_name: str
 ) -> dict[str, Any]:
-    resolved = resolve_object(
-        client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+    return resolve_object(
+        client, "recipes", recipe_name, recipe_id, entity_label="recipe", required=True
     )
-    if resolved["ok"] and resolved["id"] is None:
-        return {"ok": False, "error": "Either recipe_id or recipe_name is required"}
-    return resolved
 
 
-def _resolve_product_id(
+def _resolve_product(
     client: GrocyClient, product_id: int | None, product_name: str
 ) -> dict[str, Any]:
-    resolved = resolve_object(
-        client, "products", product_name, product_id, entity_label="product"
+    return resolve_object(
+        client,
+        "products",
+        product_name,
+        product_id,
+        entity_label="product",
+        required=True,
     )
-    if resolved["ok"] and resolved["id"] is None:
-        return {"ok": False, "error": "Either product_id or product_name is required"}
-    return resolved
 
 
 def _resolve_unit_id(
@@ -209,7 +208,7 @@ def _add_single_ingredient(
             "error": "Either product_id or product_name is required",
         }
 
-    resolved_product = _resolve_product_id(client, product_id, product_name)
+    resolved_product = _resolve_product(client, product_id, product_name)
     if not resolved_product["ok"]:
         return {
             "status": "error",
@@ -301,7 +300,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         recipe_id: int | None = None, recipe_name: str = ""
     ) -> dict[str, Any]:
         """Get full recipe details with ingredients and description HTML."""
-        resolved = _resolve_recipe_id(client, recipe_id, recipe_name)
+        resolved = _resolve_recipe(client, recipe_id, recipe_name)
         if not resolved["ok"]:
             return {
                 "status": "error",
@@ -333,7 +332,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         recipe_id: int | None = None, recipe_name: str = ""
     ) -> dict[str, Any]:
         """Get fulfillment status for one recipe."""
-        resolved = _resolve_recipe_id(client, recipe_id, recipe_name)
+        resolved = _resolve_recipe(client, recipe_id, recipe_name)
         if not resolved["ok"]:
             return {
                 "status": "error",
@@ -354,7 +353,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         recipe_id: int | None = None, recipe_name: str = "", servings: float = 1.0
     ) -> dict[str, Any]:
         """Mark a recipe as cooked and deduct scaled ingredient amounts from stock."""
-        resolved = _resolve_recipe_id(client, recipe_id, recipe_name)
+        resolved = _resolve_recipe(client, recipe_id, recipe_name)
         if not resolved["ok"]:
             return {
                 "status": "error",
@@ -413,7 +412,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         servings: int | None = None,
     ) -> dict[str, Any]:
         """Update existing recipe metadata without changing ingredients."""
-        resolved = _resolve_recipe_id(client, recipe_id, recipe_name)
+        resolved = _resolve_recipe(client, recipe_id, recipe_name)
         if not resolved["ok"]:
             return {
                 "status": "error",

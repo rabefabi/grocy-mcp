@@ -148,12 +148,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation with product name, amount added, location, and new stock level
         """
         resolved_product = resolve_object(
-            client, "products", product_name, product_id, entity_label="product"
+            client,
+            "products",
+            product_name,
+            product_id,
+            entity_label="product",
+            required=True,
         )
         if not resolved_product["ok"]:
             return resolution_error(resolved_product)
-        if resolved_product["id"] is None:
-            return {"error": "Either product_name or product_id is required"}
         product_id = int(resolved_product["id"])
 
         resolved_location = resolve_object(
@@ -208,12 +211,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation with product name, amount consumed, and remaining stock
         """
         resolved_product = resolve_object(
-            client, "products", product_name, product_id, entity_label="product"
+            client,
+            "products",
+            product_name,
+            product_id,
+            entity_label="product",
+            required=True,
         )
         if not resolved_product["ok"]:
             return resolution_error(resolved_product)
-        if resolved_product["id"] is None:
-            return {"error": "Either product_name or product_id is required"}
         product_id = int(resolved_product["id"])
 
         body = {"amount": amount, "spoiled": spoiled}
@@ -247,12 +253,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation with product name and new opened/unopened amounts
         """
         resolved_product = resolve_object(
-            client, "products", product_name, product_id, entity_label="product"
+            client,
+            "products",
+            product_name,
+            product_id,
+            entity_label="product",
+            required=True,
         )
         if not resolved_product["ok"]:
             return resolution_error(resolved_product)
-        if resolved_product["id"] is None:
-            return {"error": "Either product_name or product_id is required"}
         product_id = int(resolved_product["id"])
 
         body = {"amount": amount}
@@ -289,12 +298,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation with product, amount, and locations
         """
         resolved_product = resolve_object(
-            client, "products", product_name, product_id, entity_label="product"
+            client,
+            "products",
+            product_name,
+            product_id,
+            entity_label="product",
+            required=True,
         )
         if not resolved_product["ok"]:
             return resolution_error(resolved_product)
-        if resolved_product["id"] is None:
-            return {"error": "Either product_name or product_id is required"}
         product_id = int(resolved_product["id"])
 
         # Resolve location IDs

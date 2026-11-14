@@ -101,12 +101,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             date = datetime.now().strftime("%Y-%m-%d")
 
         resolved_recipe = resolve_object(
-            client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+            client,
+            "recipes",
+            recipe_name,
+            recipe_id,
+            entity_label="recipe",
+            required=True,
         )
         if not resolved_recipe["ok"]:
             return resolution_error(resolved_recipe)
-        if resolved_recipe["id"] is None:
-            return {"error": "Either recipe_name or recipe_id is required"}
         recipe_id = int(resolved_recipe["id"])
 
         # Note: Grocy 4.6+ does not support 'servings' in meal_plan table

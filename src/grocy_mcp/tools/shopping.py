@@ -76,12 +76,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation of what was added
         """
         resolved_product = resolve_object(
-            client, "products", product_name, product_id, entity_label="product"
+            client,
+            "products",
+            product_name,
+            product_id,
+            entity_label="product",
+            required=True,
         )
         if not resolved_product["ok"]:
             return resolution_error(resolved_product)
-        if resolved_product["id"] is None:
-            return {"error": "Either product_name or product_id is required"}
         product_id = int(resolved_product["id"])
 
         body: dict[str, Any] = {"product_id": product_id, "amount": amount}
@@ -116,12 +119,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation of what was removed
         """
         resolved_product = resolve_object(
-            client, "products", product_name, product_id, entity_label="product"
+            client,
+            "products",
+            product_name,
+            product_id,
+            entity_label="product",
+            required=True,
         )
         if not resolved_product["ok"]:
             return resolution_error(resolved_product)
-        if resolved_product["id"] is None:
-            return {"error": "Either product_name or product_id is required"}
         product_id = int(resolved_product["id"])
 
         body: dict[str, Any] = {"product_id": product_id}
@@ -175,12 +181,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             Confirmation of what was added to the shopping list
         """
         resolved_recipe = resolve_object(
-            client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+            client,
+            "recipes",
+            recipe_name,
+            recipe_id,
+            entity_label="recipe",
+            required=True,
         )
         if not resolved_recipe["ok"]:
             return resolution_error(resolved_recipe)
-        if resolved_recipe["id"] is None:
-            return {"error": "Either recipe_name or recipe_id is required"}
         recipe_id = int(resolved_recipe["id"])
 
         try:

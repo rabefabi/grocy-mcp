@@ -154,18 +154,28 @@ def resolve_name_and_id(
     resolve: Callable[[str], dict[str, Any]],
     *,
     entity_label: str = "item",
+    required: bool = False,
 ) -> dict[str, Any]:
     """
     Resolve an entity a caller named by name, by ID, or by both.
 
     Only an ID: returned as is, without a lookup. Only a name: ``resolve(name)``.
     Both: the name is resolved and must land uniquely on that ID; a different
-    entity, no match or an ambiguous name gives ``ok: False``. Neither: ``ok``
-    with ``id: None``, so callers decide whether the entity is required.
+    entity, no match or an ambiguous name gives ``ok: False``. Neither:
+    ``ok: False`` if ``required``, otherwise ``ok`` with ``id: None``.
 
     Returns the ``resolve_by_name`` shape (ok, id, name, matches, error,
     suggestion).
     """
+    if not name and entity_id is None and required:
+        return {
+            "ok": False,
+            "id": None,
+            "name": None,
+            "matches": [],
+            "error": f"Either {entity_label}_name or {entity_label}_id is required",
+            "suggestion": None,
+        }
     if not name:
         return {
             "ok": True,
@@ -209,11 +219,13 @@ def resolve_object(
     entity_id: int | None,
     *,
     entity_label: str,
+    required: bool = False,
     **resolve_kwargs: Any,
 ) -> dict[str, Any]:
     """``resolve_name_and_id`` for a Grocy object table (products, locations, ...).
 
-    The table is fetched only when a name is given.
+    The table is fetched only when a name is given. ``resolve_kwargs`` go to
+    ``resolve_by_name``.
     """
     return resolve_name_and_id(
         name,
@@ -225,6 +237,7 @@ def resolve_object(
             **resolve_kwargs,
         ),
         entity_label=entity_label,
+        required=required,
     )
 
 
