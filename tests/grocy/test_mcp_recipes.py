@@ -171,6 +171,64 @@ class TestProductShape:
         assert "qu_id_stock" in first
         assert "location_id" in first
 
+    @pytest.mark.asyncio
+    async def test_products_return_names_next_to_ids(
+        self,
+        call_tool,
+        api_get,
+        api_post,
+        api_delete,
+        create_product_api,
+        default_qu_id,
+        default_location_id,
+        name_factory,
+    ):
+        prefix = name_factory("names")
+        group_name = f"{prefix}-group"
+        cleanup: list[str] = []
+        try:
+            group = api_post("/api/objects/product_groups", {"name": group_name})
+            group_id = int(group["created_object_id"])
+            cleanup.append(f"/api/objects/product_groups/{group_id}")
+
+            parent = create_product_api(f"{prefix}-parent")
+            cleanup.insert(0, f"/api/objects/products/{parent['id']}")
+            child = create_product_api(f"{prefix}-child")
+            cleanup.insert(0, f"/api/objects/products/{child['id']}")
+            updated = await call_tool(
+                "update_product",
+                product_id=int(child["id"]),
+                product_group_id=group_id,
+                parent_product_id=int(parent["id"]),
+            )
+            assert updated.get("status") == "success", updated
+
+            unit_name = api_get(f"/api/objects/quantity_units/{default_qu_id}")["name"]
+            location_name = (
+                api_get(f"/api/objects/locations/{default_location_id}")["name"]
+                if default_location_id is not None
+                else None
+            )
+
+            result = await call_tool("get_products", query=prefix)
+            by_id = {int(p["id"]): p for p in result}
+
+            named = by_id[int(child["id"])]
+            assert named["product_group_name"] == group_name
+            assert named["parent_product_name"] == f"{prefix}-parent"
+            assert named["location_name"] == location_name
+            assert named["qu_stock_name"] == unit_name
+            assert named["qu_purchase_name"] == unit_name
+            assert named["qu_consume_name"] == unit_name
+
+            unnamed = by_id[int(parent["id"])]
+            assert unnamed["product_group_id"] is None
+            assert unnamed["product_group_name"] is None
+            assert unnamed["parent_product_name"] is None
+        finally:
+            for path in cleanup:
+                api_delete(path)
+
 
 class TestGrocyRecipesMCP:
     @pytest.mark.asyncio

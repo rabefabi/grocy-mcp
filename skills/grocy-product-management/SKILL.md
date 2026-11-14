@@ -34,7 +34,7 @@ Each Grocy product has:
 
 ### Product Queries
 
-- `get_products(query=...)` — search existing products by name
+- `get_products(query=...)` — search existing products by name. Each product carries names next to its IDs: `location_name`, `product_group_name`, `parent_product_name`, and `qu_stock_name`/`qu_purchase_name`/`qu_consume_name` for the three units.
 - `lookup_product_openfoodfacts(query=..., barcode=...)` — search OpenFoodFacts for product info (nutrition, images)
 
 ### Product Operations

@@ -10,6 +10,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 ### Added
 
 - `get_meal_plan` returns the recipe name and product name next to their IDs.
+- `get_products` returns the location, product group, parent product and unit names next to their IDs.
 
 ## 0.2.0 – 2026-11-14
 
