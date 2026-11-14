@@ -56,3 +56,26 @@ return action results, not entity lists — they are less noisy and are not in s
 - New tests assert that noise fields are absent from shaped responses.
 - No external API or skill signature changes — the shaping happens inside the tool function.
 - Future tools should import `shape_response` and declare a keep-set at the top of the tool.
+
+## Amendment 2026-11-14: names next to IDs, flat stock rows
+
+Dogfooding showed that ID-only responses cost the agent extra tool rounds
+(`get_shopping_list` needed three to answer "what is on the shopping list"),
+and that the unfiltered `get_stock` response reached about 98 KB in production.
+Decided in [Names, IDs and response size](https://github.com/rabefabi/grocy-mcp/issues/2).
+
+1. **Names next to IDs** — every ID in a read response that points at another
+   entity gets a flat name field beside it: `product_name`, `unit_name`
+   (the unit's singular `name`), `location_name`, `recipe_name`. The IDs stay
+   (property 3 still holds). Applies to all `get_*` tools.
+2. **Flat stock rows** — `get_stock` returns one flat row per product on every
+   path, including the location filter, where the server sums the stock entries
+   per product (earliest best-before date). The nested `product` sub-object
+   goes away, so property 4 no longer applies to `get_stock`.
+3. **Stock filters and paging** — `get_stock` filters by location, product
+   (name or ID) and product group, takes optional `limit`/`offset`, sorts by
+   product name, and always returns `{total, items}`, with or without `limit`.
+4. **Name and ID together** — when a caller passes both a name and an ID for
+   the same entity, the name is resolved as usual; unless it resolves uniquely
+   to that ID, the tool returns the `{error, matches, suggestion}` shape instead
+   of letting either side win.
