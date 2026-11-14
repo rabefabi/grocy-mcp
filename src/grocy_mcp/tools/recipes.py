@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from PIL import Image
 
+from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
 from ..utils.shape import shape_response
 
@@ -306,7 +307,7 @@ def _compress_to_jpeg(image_bytes: bytes, max_size: int = 500_000) -> bytes:
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register recipe tools."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_recipes(query: str = "") -> list[dict[str, Any]]:
         """Search or list recipes by name."""
         recipes = client.get("/api/objects/recipes")
@@ -317,7 +318,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             ]
         return shape_response(recipes, _RECIPE_KEEP)
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_recipe_details(
         recipe_id: int | None = None, recipe_name: str = ""
     ) -> dict[str, Any]:
@@ -338,7 +339,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         )
         return {"status": "success", "recipe": recipe, "ingredients": ingredients}
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_recipes_fulfillment(
         include_unfulfillable: bool = False,
     ) -> list[dict[str, Any]]:
@@ -349,7 +350,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             return shaped
         return [r for r in shaped if r.get("need_fulfilled") == 1]
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_recipe_fulfillment(
         recipe_id: int | None = None, recipe_name: str = ""
     ) -> dict[str, Any]:
@@ -370,7 +371,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to get recipe fulfillment: %s", exc)
             return {"status": "error", "error": str(exc)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def consume_recipe(
         recipe_id: int | None = None, recipe_name: str = "", servings: float = 1.0
     ) -> dict[str, Any]:
@@ -393,7 +394,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to consume recipe: %s", exc)
             return {"status": "error", "error": str(exc)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def create_recipe(
         name: str,
         description: str = "",
@@ -425,7 +426,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to create recipe '%s': %s", name, exc)
             return {"status": "error", "error": str(exc)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=DESTRUCTIVE)
     def update_recipe(
         recipe_id: int | None = None,
         recipe_name: str = "",
@@ -486,7 +487,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "suggestion": "Verify recipe_id and updatable fields",
             }
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def add_recipe_ingredient(
         recipe_id: int,
         amount: float,
@@ -510,7 +511,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             note=note,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def add_recipe_ingredients(
         recipe_id: int,
         ingredients: list[dict[str, Any]],
@@ -564,7 +565,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             "results": results,
         }
 
-    @mcp.tool()
+    @mcp.tool(annotations=DESTRUCTIVE)
     def upload_recipe_image(
         recipe_id: int, image_url: str = "", image_data: str = ""
     ) -> dict[str, Any]:
@@ -607,7 +608,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "suggestion": "Verify recipe ID and image payload",
             }
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def match_ingredient(ingredient_text: str) -> dict[str, Any]:
         """Parse ingredient text and suggest best matching Grocy product(s)."""
         parsed = _parse_ingredient_text(ingredient_text)

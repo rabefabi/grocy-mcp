@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
 
 if TYPE_CHECKING:
@@ -50,7 +51,7 @@ def _resolve_unit_id(client: GrocyClient, unit_name: str) -> dict[str, Any]:
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register product and conversion tools."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def create_product(
         name: str,
         location_name: str = "",
@@ -203,7 +204,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             response["warnings"] = warnings
         return response
 
-    @mcp.tool()
+    @mcp.tool(annotations=DESTRUCTIVE)
     def update_product(
         product_id: int,
         name: str | None = None,
@@ -287,7 +288,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "suggestion": "Verify product_id and updatable fields",
             }
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_quantity_unit_conversions(
         product_id: int | None = None,
     ) -> list[dict[str, Any]]:
@@ -297,7 +298,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             params["query[]"] = f"product_id={product_id}"
         return client.get("/api/objects/quantity_unit_conversions", params=params)
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def create_quantity_unit_conversion(
         from_qu_id: int,
         to_qu_id: int,

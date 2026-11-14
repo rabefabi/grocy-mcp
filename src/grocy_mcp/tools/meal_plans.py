@@ -11,6 +11,7 @@ import logging
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
 from ..utils.shape import shape_response
 
@@ -34,7 +35,7 @@ log = logging.getLogger("grocy_mcp")
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register meal planning tools."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_meal_plan(from_date: str = "", to_date: str = "") -> list[dict[str, Any]]:
         """
         Get the meal plan for a date range.
@@ -59,7 +60,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         ]
         return shape_response(filtered, _MEAL_PLAN_KEEP)
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def create_meal_plan_entry(
         recipe_name: str = "",
         recipe_id: int | None = None,
@@ -118,7 +119,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to create meal plan entry: %s", e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=DESTRUCTIVE)
     def delete_meal_plan_entry(meal_plan_id: int) -> dict[str, Any]:
         """
         Remove a meal from the meal plan.

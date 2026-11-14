@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
 from ..utils.shape import shape_response
 
@@ -33,7 +34,7 @@ log = logging.getLogger("grocy_mcp")
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register shopping list tools."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_shopping_list() -> list[dict[str, Any]]:
         """
         Get the current shopping list.
@@ -44,7 +45,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         raw = client.get("/api/objects/shopping_list")
         return shape_response(raw, _SHOPPING_LIST_KEEP)
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def add_to_shopping_list(
         product_name: str = "",
         product_id: int | None = None,
@@ -91,7 +92,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to add to shopping list: %s", e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=DESTRUCTIVE)
     def remove_from_shopping_list(
         product_name: str = "",
         product_id: int | None = None,
@@ -138,7 +139,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to remove from shopping list: %s", e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=DESTRUCTIVE)
     def clear_shopping_list() -> dict[str, Any]:
         """
         Clear all items from the shopping list.
@@ -159,7 +160,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to clear shopping list: %s", e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def add_recipe_missing_to_shopping_list(
         recipe_name: str = "",
         recipe_id: int | None = None,

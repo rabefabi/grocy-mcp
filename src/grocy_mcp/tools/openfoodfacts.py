@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from ..utils.annotations import READ_ONLY
+
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
@@ -80,7 +82,7 @@ def _make_request_with_retry(
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register Open Food Facts lookup tool."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def lookup_product_openfoodfacts(
         query: str = "", barcode: str = ""
     ) -> dict[str, Any]:

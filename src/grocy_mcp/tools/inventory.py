@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from ..utils.annotations import READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
 from ..utils.shape import shape_response
 
@@ -57,7 +58,7 @@ log = logging.getLogger("grocy_mcp")
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register inventory management tools."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_stock(
         location_name: str = "", location_id: int | None = None
     ) -> list[dict[str, Any]]:
@@ -104,7 +105,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             nested_keep=_STOCK_NESTED_PRODUCT_KEEP,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_volatile_stock() -> dict[str, Any]:
         """
         Get items that are expiring soon, overdue, or already expired.
@@ -117,7 +118,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         """
         return client.get("/api/stock/volatile")
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def purchase_product(
         product_name: str = "",
         product_id: int | None = None,
@@ -196,7 +197,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to purchase product %s: %s", product_id, e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def consume_product(
         product_name: str = "",
         product_id: int | None = None,
@@ -244,7 +245,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to consume product %s: %s", product_id, e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def open_product(
         product_name: str = "",
         product_id: int | None = None,
@@ -290,7 +291,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to open product %s: %s", product_id, e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool()
+    @mcp.tool(annotations=WRITE)
     def transfer_product(
         product_name: str = "",
         product_id: int | None = None,

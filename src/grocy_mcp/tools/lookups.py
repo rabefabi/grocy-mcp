@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from ..utils.annotations import READ_ONLY
 from ..utils.shape import shape_response
 
 if TYPE_CHECKING:
@@ -36,7 +37,7 @@ _PRODUCT_KEEP = {
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register lookup tools."""
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_products(query: str = "") -> list[dict[str, Any]]:
         """
         Search for products by name.
@@ -59,7 +60,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             ]
         return shape_response(products, _PRODUCT_KEEP)
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_locations() -> list[dict[str, Any]]:
         """
         List all storage locations in Grocy.
@@ -69,7 +70,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         """
         return client.get("/api/objects/locations")
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_quantity_units() -> list[dict[str, Any]]:
         """
         List all quantity units (e.g., grams, ml, cups).
@@ -79,7 +80,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         """
         return client.get("/api/objects/quantity_units")
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     def get_product_groups() -> list[dict[str, Any]]:
         """
         List all product categories/groups.
