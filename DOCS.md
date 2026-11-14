@@ -22,7 +22,7 @@ AI agents interact with your Grocy ERP instance via natural language.
 Once the add-on is running, the MCP endpoint is available at:
 
 ```
-http://<your-ha-ip>:8001/mcp/
+http://<your-ha-ip>:8001/mcp
 ```
 
 ### Open WebUI
@@ -32,7 +32,7 @@ In Open WebUI → **Settings → Tools → Add MCP Server**:
 ```json
 {
   "grocy": {
-    "url": "http://<your-ha-ip>:8001/mcp/"
+    "url": "http://<your-ha-ip>:8001/mcp"
   }
 }
 ```
@@ -43,7 +43,7 @@ In Open WebUI → **Settings → Tools → Add MCP Server**:
 {
   "mcpServers": {
     "grocy": {
-      "url": "http://<your-ha-ip>:8001/mcp/"
+      "url": "http://<your-ha-ip>:8001/mcp"
     }
   }
 }

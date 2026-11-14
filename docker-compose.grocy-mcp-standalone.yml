@@ -3,7 +3,7 @@
 #   cp .env.example .env   # set GROCY_URL and GROCY_API_TOKEN
 #   docker compose -f docker-compose.grocy-mcp-standalone.yml --env-file .env up -d --build
 #
-# MCP endpoint: http://<host>:8001/mcp/
+# MCP endpoint: http://<host>:8001/mcp
 
 name: grocy-mcp
 

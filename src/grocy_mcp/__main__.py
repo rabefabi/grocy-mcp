@@ -13,7 +13,7 @@ log = logging.getLogger("grocy_mcp")
 
 log.info("Grocy MCP Server starting on port %d", settings.mcp_port)
 log.info("Grocy URL: %s", settings.grocy_url)
-log.info("MCP endpoint: http://0.0.0.0:%d/mcp/", settings.mcp_port)
+log.info("MCP endpoint: http://0.0.0.0:%d/mcp", settings.mcp_port)
 
 mcp = create_app()
 mcp.run(transport="streamable-http")

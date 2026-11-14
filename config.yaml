@@ -19,7 +19,7 @@ init: false
 ports:
   8001/tcp: 8001
 ports_description:
-  8001/tcp: "MCP server HTTP endpoint (connect clients to /mcp/)"
+  8001/tcp: "MCP server HTTP endpoint (connect clients to /mcp)"
 
 watchdog: "http://[HOST]:[PORT:8001]/health"
 

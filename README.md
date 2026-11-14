@@ -58,14 +58,14 @@ uv run python -m grocy_mcp     # or: just grocy-mcp-run
 
 ## Connecting an MCP client
 
-The server speaks **Streamable HTTP** at `http://<host>:<port>/mcp/`. A health endpoint is at `/health`.
+The server speaks **Streamable HTTP** at `http://<host>:<port>/mcp`. A health endpoint is at `/health`.
 
 Example client config:
 
 ```json
 {
   "mcpServers": {
-    "grocy": { "type": "http", "url": "http://<host>:8001/mcp/" }
+    "grocy": { "type": "http", "url": "http://<host>:8001/mcp" }
   }
 }
 ```

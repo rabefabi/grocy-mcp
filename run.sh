@@ -42,7 +42,7 @@ esac
 
 bashio::log.info "Connecting to Grocy at: ${GROCY_URL}"
 bashio::log.info "Log level: ${LOG_LEVEL}"
-bashio::log.info "MCP endpoint will be available at: http://$(hostname):8001/mcp/"
+bashio::log.info "MCP endpoint will be available at: http://$(hostname):8001/mcp"
 
 # ---------------------------------------------------------------------------
 # Export to the Python process environment
