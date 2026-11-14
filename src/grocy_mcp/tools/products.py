@@ -6,7 +6,12 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
-from ..utils.resolve import resolve_by_name
+from ..utils.resolve import (
+    resolution_error,
+    resolve_by_name,
+    resolve_name_and_id,
+    resolve_object,
+)
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -16,10 +21,16 @@ if TYPE_CHECKING:
 log = logging.getLogger("grocy_mcp")
 
 
-def _resolve_location_id(client: GrocyClient, location_name: str) -> dict[str, Any]:
-    locations = client.get("/api/objects/locations")
-    return resolve_by_name(
-        locations, location_name, entity_label="location", reject_low_confidence=True
+def _resolve_location(
+    client: GrocyClient, location_name: str | None, location_id: int | None
+) -> dict[str, Any]:
+    return resolve_object(
+        client,
+        "locations",
+        location_name,
+        location_id,
+        entity_label="location",
+        reject_low_confidence=True,
     )
 
 
@@ -72,6 +83,9 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         Uses sensible defaults when optional IDs are omitted:
         - default location from existing products (if available)
         - first quantity unit as fallback for stock/purchase/consume units
+
+        Location and units can be given by name or ID. When both are given
+        (e.g. location_name and location_id), they must name the same entity.
         """
         # Grocy API does not support query param - fetch all and filter client-side
         all_products = client.get("/api/objects/products")
@@ -92,54 +106,30 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "suggestion": "Use the existing product or choose a different name",
             }
 
-        resolved_location_id = location_id
-        if resolved_location_id is None and location_name:
-            resolved = _resolve_location_id(client, location_name)
-            if not resolved["ok"]:
-                return {
-                    "status": "error",
-                    "error": resolved["error"],
-                    "matches": resolved["matches"],
-                    "suggestion": resolved["suggestion"],
-                }
-            resolved_location_id = int(resolved["id"])
+        resolved = _resolve_location(client, location_name, location_id)
+        if not resolved["ok"]:
+            return {"status": "error", **resolution_error(resolved)}
+        resolved_location_id = resolved["id"]
 
         units = client.get("/api/objects/quantity_units")
         fallback_unit_id = int(units[0]["id"]) if units else None
 
-        stock_unit = qu_id_stock
-        purchase_unit = qu_id_purchase
-        consume_unit = qu_id_consume
-
-        if stock_unit is None and qu_stock_name:
-            resolved = _resolve_unit_id(client, qu_stock_name)
+        resolved_units: list[int | None] = []
+        for unit_name, unit_id in (
+            (qu_stock_name, qu_id_stock),
+            (qu_purchase_name, qu_id_purchase),
+            (qu_consume_name, qu_id_consume),
+        ):
+            resolved = resolve_name_and_id(
+                unit_name,
+                unit_id,
+                lambda name: _resolve_unit_id(client, name),
+                entity_label="quantity unit",
+            )
             if not resolved["ok"]:
-                return {
-                    "status": "error",
-                    "error": resolved["error"],
-                    "matches": resolved["matches"],
-                }
-            stock_unit = int(resolved["id"])
-
-        if purchase_unit is None and qu_purchase_name:
-            resolved = _resolve_unit_id(client, qu_purchase_name)
-            if not resolved["ok"]:
-                return {
-                    "status": "error",
-                    "error": resolved["error"],
-                    "matches": resolved["matches"],
-                }
-            purchase_unit = int(resolved["id"])
-
-        if consume_unit is None and qu_consume_name:
-            resolved = _resolve_unit_id(client, qu_consume_name)
-            if not resolved["ok"]:
-                return {
-                    "status": "error",
-                    "error": resolved["error"],
-                    "matches": resolved["matches"],
-                }
-            consume_unit = int(resolved["id"])
+                return {"status": "error", **resolution_error(resolved)}
+            resolved_units.append(resolved["id"])
+        stock_unit, purchase_unit, consume_unit = resolved_units
 
         if stock_unit is None:
             stock_unit = fallback_unit_id
@@ -219,7 +209,9 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         """
         Update an existing Grocy product.
 
-        Only explicitly provided fields are sent to the API.
+        Only explicitly provided fields are sent to the API. When both
+        location_name and location_id are given, they must name the same
+        location.
         """
         warnings: list[str] = []
         payload: dict[str, Any] = {}
@@ -232,18 +224,10 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         if description is not None:
             payload["description"] = description
 
-        if location_id is not None:
-            payload["location_id"] = int(location_id)
-
-        if location_name:
-            resolved = _resolve_location_id(client, location_name)
-            if not resolved["ok"]:
-                return {
-                    "status": "error",
-                    "error": resolved["error"],
-                    "matches": resolved["matches"],
-                    "suggestion": resolved["suggestion"],
-                }
+        resolved = _resolve_location(client, location_name, location_id)
+        if not resolved["ok"]:
+            return {"status": "error", **resolution_error(resolved)}
+        if resolved["id"] is not None:
             payload["location_id"] = int(resolved["id"])
 
         if parent_product_id is not None:

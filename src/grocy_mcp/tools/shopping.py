@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
-from ..utils.resolve import resolve_by_name
+from ..utils.resolve import resolution_error, resolve_object
 from ..utils.shape import names_by_id, shape_response
 
 _SHOPPING_LIST_KEEP = {
@@ -67,29 +67,22 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             product_name: Product name (resolved to ID if provided)
-            product_id: Direct product ID
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
             amount: Quantity to add
             note: Optional note (e.g., "For the pasta recipe")
 
         Returns:
             Confirmation of what was added
         """
-        # Resolve product_id if name provided
-        if not product_id:
-            if not product_name:
-                return {"error": "Either product_name or product_id is required"}
-
-            products = client.get("/api/objects/products")
-            resolved_product = resolve_by_name(
-                products, product_name, entity_label="product"
-            )
-            if not resolved_product["ok"]:
-                return {
-                    "error": resolved_product["error"],
-                    "matches": resolved_product["matches"],
-                    "suggestion": resolved_product["suggestion"],
-                }
-            product_id = int(resolved_product["id"])
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        if resolved_product["id"] is None:
+            return {"error": "Either product_name or product_id is required"}
+        product_id = int(resolved_product["id"])
 
         body: dict[str, Any] = {"product_id": product_id, "amount": amount}
         if note:
@@ -115,28 +108,21 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             product_name: Product name
-            product_id: Direct product ID
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
             amount: Optional specific amount to remove
 
         Returns:
             Confirmation of what was removed
         """
-        # Resolve product_id if name provided
-        if not product_id:
-            if not product_name:
-                return {"error": "Either product_name or product_id is required"}
-
-            products = client.get("/api/objects/products")
-            resolved_product = resolve_by_name(
-                products, product_name, entity_label="product"
-            )
-            if not resolved_product["ok"]:
-                return {
-                    "error": resolved_product["error"],
-                    "matches": resolved_product["matches"],
-                    "suggestion": resolved_product["suggestion"],
-                }
-            product_id = int(resolved_product["id"])
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        if resolved_product["id"] is None:
+            return {"error": "Either product_name or product_id is required"}
+        product_id = int(resolved_product["id"])
 
         body: dict[str, Any] = {"product_id": product_id}
         if amount is not None:
@@ -182,27 +168,20 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             recipe_name: Recipe name (resolved to ID if provided)
-            recipe_id: Direct recipe ID
+            recipe_id: Recipe ID; if given with recipe_name, both must name
+                       the same recipe
 
         Returns:
             Confirmation of what was added to the shopping list
         """
-        # Resolve recipe_id if name provided
-        if not recipe_id:
-            if not recipe_name:
-                return {"error": "Either recipe_name or recipe_id is required"}
-
-            recipes = client.get("/api/objects/recipes")
-            resolved_recipe = resolve_by_name(
-                recipes, recipe_name, entity_label="recipe"
-            )
-            if not resolved_recipe["ok"]:
-                return {
-                    "error": resolved_recipe["error"],
-                    "matches": resolved_recipe["matches"],
-                    "suggestion": resolved_recipe["suggestion"],
-                }
-            recipe_id = int(resolved_recipe["id"])
+        resolved_recipe = resolve_object(
+            client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+        )
+        if not resolved_recipe["ok"]:
+            return resolution_error(resolved_recipe)
+        if resolved_recipe["id"] is None:
+            return {"error": "Either recipe_name or recipe_id is required"}
+        recipe_id = int(resolved_recipe["id"])
 
         try:
             result = client.post(

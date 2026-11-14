@@ -11,7 +11,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import READ_ONLY, WRITE
-from ..utils.resolve import resolve_by_name
+from ..utils.resolve import resolution_error, resolve_by_name, resolve_object
 from ..utils.shape import names_by_id
 
 if TYPE_CHECKING:
@@ -72,7 +72,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
     @mcp.tool(annotations=READ_ONLY)
     def get_stock(
         location_name: str = "", location_id: int | None = None
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, Any]] | dict[str, Any]:
         """
         Get current stock in the pantry.
 
@@ -80,8 +80,8 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             location_name: Storage location name (e.g., "Fridge", "Freezer")
-                          Resolved to ID if provided
-            location_id: Direct storage location ID (overrides location_name)
+            location_id: Storage location ID; if given with location_name, both
+                         must name the same location
 
         Returns:
             One row per product and location with product_id, product_name,
@@ -90,23 +90,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             unit_name (the product's stock unit). With a location filter
             that is one row per product.
         """
-        if location_id is not None:
-            raw = client.get(f"/api/stock/locations/{location_id}/entries")
-            return _stock_rows(client, raw)
-
-        if location_name:
-            locations = client.get("/api/objects/locations")
-            resolved_location = resolve_by_name(
-                locations, location_name, entity_label="location"
+        resolved_location = resolve_object(
+            client, "locations", location_name, location_id, entity_label="location"
+        )
+        if not resolved_location["ok"]:
+            return resolution_error(resolved_location)
+        if resolved_location["id"] is not None:
+            raw = client.get(
+                f"/api/stock/locations/{int(resolved_location['id'])}/entries"
             )
-            if not resolved_location["ok"]:
-                return {
-                    "error": resolved_location["error"],
-                    "matches": resolved_location["matches"],
-                    "suggestion": resolved_location["suggestion"],
-                }
-            location_id = int(resolved_location["id"])
-            raw = client.get(f"/api/stock/locations/{location_id}/entries")
             return _stock_rows(client, raw)
 
         return _stock_rows(client, client.get("/api/objects/stock"))
@@ -142,50 +134,39 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             product_name: Product name (resolved to ID if provided)
-            product_id: Direct product ID (overrides product_name)
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
             amount: Quantity purchased
             best_before_date: Expected expiry date (YYYY-MM-DD)
                             If not provided, product's default is used
             price: Optional purchase price
-            location_id: Storage location ID
+            location_id: Storage location ID; if given with location_name, both
+                         must name the same location
             location_name: Storage location name (e.g., "Fridge")
 
         Returns:
             Confirmation with product name, amount added, location, and new stock level
         """
-        # Resolve product_id if name provided
-        if not product_id:
-            if not product_name:
-                return {"error": "Either product_name or product_id is required"}
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        if resolved_product["id"] is None:
+            return {"error": "Either product_name or product_id is required"}
+        product_id = int(resolved_product["id"])
 
-            products = client.get("/api/objects/products")
-            resolved_product = resolve_by_name(
-                products, product_name, entity_label="product"
-            )
-            if not resolved_product["ok"]:
-                return {
-                    "error": resolved_product["error"],
-                    "matches": resolved_product["matches"],
-                    "suggestion": resolved_product["suggestion"],
-                }
-            product_id = int(resolved_product["id"])
-
-        # Resolve location_id if name provided
-        if not location_id and location_name:
-            locations = client.get("/api/objects/locations")
-            resolved_location = resolve_by_name(
-                locations,
-                location_name,
-                entity_label="location",
-                reject_low_confidence=True,
-            )
-            if not resolved_location["ok"]:
-                return {
-                    "error": resolved_location["error"],
-                    "matches": resolved_location["matches"],
-                    "suggestion": resolved_location["suggestion"],
-                }
-            location_id = int(resolved_location["id"])
+        resolved_location = resolve_object(
+            client,
+            "locations",
+            location_name,
+            location_id,
+            entity_label="location",
+            reject_low_confidence=True,
+        )
+        if not resolved_location["ok"]:
+            return resolution_error(resolved_location)
+        location_id = resolved_location["id"]
 
         # Build request body
         body: dict[str, Any] = {"amount": amount}
@@ -218,29 +199,22 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             product_name: Product name (resolved to ID if provided)
-            product_id: Direct product ID
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
             amount: Quantity consumed
             spoiled: If True, records as waste/spoilage
 
         Returns:
             Confirmation with product name, amount consumed, and remaining stock
         """
-        # Resolve product_id if name provided
-        if not product_id:
-            if not product_name:
-                return {"error": "Either product_name or product_id is required"}
-
-            products = client.get("/api/objects/products")
-            resolved_product = resolve_by_name(
-                products, product_name, entity_label="product"
-            )
-            if not resolved_product["ok"]:
-                return {
-                    "error": resolved_product["error"],
-                    "matches": resolved_product["matches"],
-                    "suggestion": resolved_product["suggestion"],
-                }
-            product_id = int(resolved_product["id"])
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        if resolved_product["id"] is None:
+            return {"error": "Either product_name or product_id is required"}
+        product_id = int(resolved_product["id"])
 
         body = {"amount": amount, "spoiled": spoiled}
 
@@ -265,28 +239,21 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             product_name: Product name
-            product_id: Direct product ID
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
             amount: Quantity opened (default 1)
 
         Returns:
             Confirmation with product name and new opened/unopened amounts
         """
-        # Resolve product_id if name provided
-        if not product_id:
-            if not product_name:
-                return {"error": "Either product_name or product_id is required"}
-
-            products = client.get("/api/objects/products")
-            resolved_product = resolve_by_name(
-                products, product_name, entity_label="product"
-            )
-            if not resolved_product["ok"]:
-                return {
-                    "error": resolved_product["error"],
-                    "matches": resolved_product["matches"],
-                    "suggestion": resolved_product["suggestion"],
-                }
-            product_id = int(resolved_product["id"])
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        if resolved_product["id"] is None:
+            return {"error": "Either product_name or product_id is required"}
+        product_id = int(resolved_product["id"])
 
         body = {"amount": amount}
 
@@ -312,7 +279,8 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             product_name: Product name
-            product_id: Direct product ID
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
             amount: Quantity to transfer
             from_location: Source location name or ID
             to_location: Target location name or ID
@@ -320,22 +288,14 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         Returns:
             Confirmation with product, amount, and locations
         """
-        # Resolve product_id if name provided
-        if not product_id:
-            if not product_name:
-                return {"error": "Either product_name or product_id is required"}
-
-            products = client.get("/api/objects/products")
-            resolved_product = resolve_by_name(
-                products, product_name, entity_label="product"
-            )
-            if not resolved_product["ok"]:
-                return {
-                    "error": resolved_product["error"],
-                    "matches": resolved_product["matches"],
-                    "suggestion": resolved_product["suggestion"],
-                }
-            product_id = int(resolved_product["id"])
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        if resolved_product["id"] is None:
+            return {"error": "Either product_name or product_id is required"}
+        product_id = int(resolved_product["id"])
 
         # Resolve location IDs
         locations = client.get("/api/objects/locations")

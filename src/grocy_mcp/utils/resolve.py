@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from difflib import SequenceMatcher
-from typing import Any
+from typing import TYPE_CHECKING, Any, Callable
+
+if TYPE_CHECKING:
+    from ..client import GrocyClient
 
 
 def _normalize(value: str) -> str:
@@ -142,4 +145,93 @@ def resolve_by_name(
         "matches": matches,
         "error": None,
         "suggestion": None,
+    }
+
+
+def resolve_name_and_id(
+    name: str | None,
+    entity_id: int | None,
+    resolve: Callable[[str], dict[str, Any]],
+    *,
+    entity_label: str = "item",
+) -> dict[str, Any]:
+    """
+    Resolve an entity a caller named by name, by ID, or by both.
+
+    Only an ID: returned as is, without a lookup. Only a name: ``resolve(name)``.
+    Both: the name is resolved and must land uniquely on that ID; a different
+    entity, no match or an ambiguous name gives ``ok: False``. Neither: ``ok``
+    with ``id: None``, so callers decide whether the entity is required.
+
+    Returns the ``resolve_by_name`` shape (ok, id, name, matches, error,
+    suggestion).
+    """
+    if not name:
+        return {
+            "ok": True,
+            "id": entity_id,
+            "name": None,
+            "matches": [],
+            "error": None,
+            "suggestion": None,
+        }
+
+    resolved = resolve(name)
+    if entity_id is None:
+        return resolved
+    if resolved["ok"] and int(resolved["id"]) == int(entity_id):
+        return resolved
+
+    if resolved["ok"]:
+        error = (
+            f"{entity_label} name '{name}' matches '{resolved['name']}' "
+            f"(ID {resolved['id']}), not ID {entity_id}"
+        )
+    else:
+        error = f"{resolved['error']}; cannot confirm ID {entity_id}"
+    return {
+        "ok": False,
+        "id": None,
+        "name": None,
+        "matches": resolved.get("matches", []),
+        "error": error,
+        "suggestion": (
+            f"Pass only the {entity_label} name or only its ID, "
+            "or a name and an ID of the same one"
+        ),
+    }
+
+
+def resolve_object(
+    client: GrocyClient,
+    object_type: str,
+    name: str | None,
+    entity_id: int | None,
+    *,
+    entity_label: str,
+    **resolve_kwargs: Any,
+) -> dict[str, Any]:
+    """``resolve_name_and_id`` for a Grocy object table (products, locations, ...).
+
+    The table is fetched only when a name is given.
+    """
+    return resolve_name_and_id(
+        name,
+        entity_id,
+        lambda query: resolve_by_name(
+            client.get(f"/api/objects/{object_type}"),
+            query,
+            entity_label=entity_label,
+            **resolve_kwargs,
+        ),
+        entity_label=entity_label,
+    )
+
+
+def resolution_error(resolved: dict[str, Any]) -> dict[str, Any]:
+    """The ``{error, matches, suggestion}`` fields of a failed resolution."""
+    return {
+        "error": resolved["error"],
+        "matches": resolved.get("matches", []),
+        "suggestion": resolved.get("suggestion"),
     }

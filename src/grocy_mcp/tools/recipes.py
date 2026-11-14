@@ -18,7 +18,7 @@ import httpx
 from PIL import Image
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
-from ..utils.resolve import resolve_by_name
+from ..utils.resolve import resolve_by_name, resolve_name_and_id, resolve_object
 from ..utils.shape import shape_response
 
 _RECIPE_KEEP = {
@@ -71,51 +71,37 @@ _UNIT_ALIASES = {
 def _resolve_recipe_id(
     client: GrocyClient, recipe_id: int | None, recipe_name: str
 ) -> dict[str, Any]:
-    if recipe_id is not None:
-        return {"ok": True, "id": recipe_id, "name": None}
-    if not recipe_name:
+    resolved = resolve_object(
+        client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+    )
+    if resolved["ok"] and resolved["id"] is None:
         return {"ok": False, "error": "Either recipe_id or recipe_name is required"}
-
-    recipes = client.get("/api/objects/recipes")
-    resolved = resolve_by_name(recipes, recipe_name, entity_label="recipe")
-    if not resolved["ok"]:
-        return {
-            "ok": False,
-            "error": resolved["error"],
-            "matches": resolved["matches"],
-            "suggestion": resolved["suggestion"],
-        }
-    return {"ok": True, "id": int(resolved["id"]), "name": resolved["name"]}
+    return resolved
 
 
 def _resolve_product_id(
     client: GrocyClient, product_id: int | None, product_name: str
 ) -> dict[str, Any]:
-    if product_id is not None:
-        return {"ok": True, "id": product_id, "name": None}
-    if not product_name:
+    resolved = resolve_object(
+        client, "products", product_name, product_id, entity_label="product"
+    )
+    if resolved["ok"] and resolved["id"] is None:
         return {"ok": False, "error": "Either product_id or product_name is required"}
-
-    products = client.get("/api/objects/products")
-    resolved = resolve_by_name(products, product_name, entity_label="product")
-    if not resolved["ok"]:
-        return {
-            "ok": False,
-            "error": resolved["error"],
-            "matches": resolved["matches"],
-            "suggestion": resolved["suggestion"],
-        }
-    return {"ok": True, "id": int(resolved["id"]), "name": resolved["name"]}
+    return resolved
 
 
 def _resolve_unit_id(
     client: GrocyClient, qu_id: int | None, unit_name: str
 ) -> dict[str, Any]:
-    if qu_id is not None:
-        return {"ok": True, "id": qu_id, "name": None}
-    if not unit_name:
-        return {"ok": True, "id": None, "name": None}
+    return resolve_name_and_id(
+        unit_name,
+        qu_id,
+        lambda name: _resolve_unit_name(client, name),
+        entity_label="quantity unit",
+    )
 
+
+def _resolve_unit_name(client: GrocyClient, unit_name: str) -> dict[str, Any]:
     units = client.get("/api/objects/quantity_units")
     normalized = _UNIT_ALIASES.get(unit_name.strip().lower(), unit_name.strip().lower())
 
@@ -129,15 +115,7 @@ def _resolve_unit_id(
     if len(exact) == 1:
         return {"ok": True, "id": int(exact[0]["id"]), "name": exact[0].get("name")}
 
-    resolved = resolve_by_name(units, normalized, entity_label="quantity unit")
-    if not resolved["ok"]:
-        return {
-            "ok": False,
-            "error": resolved["error"],
-            "matches": resolved["matches"],
-            "suggestion": resolved["suggestion"],
-        }
-    return {"ok": True, "id": int(resolved["id"]), "name": resolved["name"]}
+    return resolve_by_name(units, normalized, entity_label="quantity unit")
 
 
 def _parse_ingredient_text(ingredient_text: str) -> dict[str, Any]:

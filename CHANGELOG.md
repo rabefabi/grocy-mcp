@@ -14,6 +14,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 ### Changed
 
+- **Breaking:** Tools that take a name and an ID for the same product, location, unit or recipe return an error with the candidate matches when both are passed and the name does not resolve uniquely to that ID. Before, the ID won silently.
 - **Breaking:** `get_stock` returns one flat row per product and location, with product, location and unit names. Stock entries in the same location are summed and report the earliest best-before date. The nested `product` object and the raw stock entry fields are gone.
 
 ## 0.2.0 – 2026-11-14

@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
-from ..utils.resolve import resolve_by_name
+from ..utils.resolve import resolution_error, resolve_object
 from ..utils.shape import names_by_id, shape_response
 
 _MEAL_PLAN_KEEP = {
@@ -84,7 +84,8 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         Args:
             recipe_name: Recipe name (resolved to ID if provided)
-            recipe_id: Direct recipe ID
+            recipe_id: Recipe ID; if given with recipe_name, both must name
+                       the same recipe
             date: Date for this meal (YYYY-MM-DD format)
             meal_type: Meal type (e.g., "breakfast", "lunch", "dinner", "snack")
 
@@ -99,22 +100,14 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         if not date:
             date = datetime.now().strftime("%Y-%m-%d")
 
-        # Resolve recipe_id if name provided
-        if not recipe_id:
-            if not recipe_name:
-                return {"error": "Either recipe_name or recipe_id is required"}
-
-            recipes = client.get("/api/objects/recipes")
-            resolved_recipe = resolve_by_name(
-                recipes, recipe_name, entity_label="recipe"
-            )
-            if not resolved_recipe["ok"]:
-                return {
-                    "error": resolved_recipe["error"],
-                    "matches": resolved_recipe["matches"],
-                    "suggestion": resolved_recipe["suggestion"],
-                }
-            recipe_id = int(resolved_recipe["id"])
+        resolved_recipe = resolve_object(
+            client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+        )
+        if not resolved_recipe["ok"]:
+            return resolution_error(resolved_recipe)
+        if resolved_recipe["id"] is None:
+            return {"error": "Either recipe_name or recipe_id is required"}
+        recipe_id = int(resolved_recipe["id"])
 
         # Note: Grocy 4.6+ does not support 'servings' in meal_plan table
         # The servings parameter is accepted but not stored
