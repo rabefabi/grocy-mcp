@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import pytest
@@ -52,6 +53,31 @@ class TestProductPair:
         _assert_mismatch(result)
         assert _stock_amount(api_get, int(a["id"])) == 0
         assert _stock_amount(api_get, int(b["id"])) == 0
+
+
+    @pytest.mark.asyncio
+    async def test_ambiguous_name_writes_nothing(
+        self, call_tool, api_get, api_delete, create_product_api
+    ):
+        token = uuid.uuid4().hex[:6]
+        egg = create_product_api(f"{token} Ostrich egg")
+        fern = create_product_api(f"{token} Ostrich fern")
+        try:
+            result = await call_tool(
+                "purchase_product",
+                product_name=f"{token} Ostrich",
+                product_id=int(egg["id"]),
+            )
+            _assert_mismatch(result)
+            assert result["error"].startswith("Ambiguous"), result
+            assert {m["id"] for m in result["matches"]} >= {
+                int(egg["id"]),
+                int(fern["id"]),
+            }
+            assert _stock_amount(api_get, int(egg["id"])) == 0
+        finally:
+            for product in (egg, fern):
+                api_delete(f"/api/objects/products/{product['id']}")
 
 
 class TestLocationPair:
