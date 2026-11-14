@@ -1,6 +1,6 @@
 [project]
 name = "grocy-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "Grocy MCP server for Home Assistant and AI agents"
 readme = "README.md"
 license = "Apache-2.0"

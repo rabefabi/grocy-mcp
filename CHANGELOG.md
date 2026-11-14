@@ -7,6 +7,8 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 ## Unreleased
 
+## 0.2.0 – 2026-11-14
+
 ### Added
 
 - Every tool now declares whether it is read-only and whether it is destructive, so MCP clients can ask for confirmation only where it matters.
