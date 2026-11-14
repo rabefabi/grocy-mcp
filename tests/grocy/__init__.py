@@ -1,0 +1,1 @@
+"""Grocy MCP integration tests."""

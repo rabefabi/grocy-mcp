@@ -1,0 +1,37 @@
+name: "Grocy MCP Server"
+version: "0.1.0"
+slug: "grocy_mcp"
+description: >-
+  MCP (Model Context Protocol) server for Grocy ERP. Enables AI agents
+  in Open WebUI, Claude Desktop, or any MCP-compatible client to manage
+  pantry inventory, shopping lists, meal plans, and recipes via natural language.
+url: "https://github.com/rabefabi/grocy-mcp"
+stage: experimental
+arch:
+  - amd64
+  - aarch64
+  - armv7
+
+startup: services
+boot: auto
+init: false
+
+ports:
+  8001/tcp: 8001
+ports_description:
+  8001/tcp: "MCP server HTTP endpoint (connect clients to /mcp/)"
+
+watchdog: "http://[HOST]:[PORT:8001]/health"
+
+options:
+  grocy_url: ""
+  grocy_api_token: ""
+  log_level: "info"
+
+schema:
+  grocy_url: str
+  grocy_api_token: str
+  log_level: list(debug|info|warning|error)
+
+# /data is always writable – used for any future persistent state
+# No other HA directory mounts needed; this add-on only talks to Grocy's HTTP API

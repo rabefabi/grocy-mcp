@@ -1,0 +1,30 @@
+# Grocy MCP server as a standalone HTTP endpoint, e.g. for Open WebUI.
+#
+#   cp .env.example .env   # set GROCY_URL and GROCY_API_TOKEN
+#   docker compose -f docker-compose.grocy-mcp-standalone.yml --env-file .env up -d --build
+#
+# MCP endpoint: http://<host>:8001/mcp/
+
+name: grocy-mcp
+
+services:
+
+  grocy-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    container_name: grocy-mcp
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      GROCY_URL: ${GROCY_URL:?Set GROCY_URL in .env}
+      GROCY_API_TOKEN: ${GROCY_API_TOKEN:?Set GROCY_API_TOKEN in .env}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MCP_PORT: 8001
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s

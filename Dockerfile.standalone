@@ -1,0 +1,25 @@
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH"
+
+RUN pip install --no-cache-dir uv
+
+RUN useradd -r -u 1000 -s /bin/false appuser
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
+
+COPY src/ ./src/
+RUN uv sync --frozen --no-dev
+
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
+ENV MCP_PORT=8001
+
+CMD ["python", "-m", "grocy_mcp"]

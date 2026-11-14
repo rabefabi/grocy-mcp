@@ -1,0 +1,51 @@
+docs/scratchpad
+data/recipes
+
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+.eggs/
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Type-checker caches
+.mypy_cache/
+.ruff_cache/
+
+# Test / coverage output
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Environment variables (copy .env.example → .env and fill in your values)
+.env
+# Test instance env — contains real API tokens; never commit
+.env.test.local
+.env.grocy.test
+
+# macOS metadata
+.DS_Store
+# Windows metadata
+Thumbs.db
+
+# Editor / IDE artifacts
+.idea/
+*.swp
+*.swo
+
+# Local docker-compose overrides (machine-specific port or volume adjustments)
+docker-compose.override.yml
+
+## Claude
+.claude/
+.mcp.json
+.vscode/
+
+# Git worktrees
+.worktrees/

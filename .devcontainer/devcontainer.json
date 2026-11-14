@@ -1,0 +1,122 @@
+{
+  "name": "Grocy MCP Server",
+
+  // Build from the self-contained Dockerfile.
+  // The same image can be used for CI and cloud dev environments.
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+
+  // Devcontainer features — Docker-in-Docker lets the team spin up
+  // Grocy and MCP server test instances inside the dev environment.
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:3": {}
+  },
+
+  // Persistent volumes.
+  //
+  // Claude Code config volume → ~/.claude/ inside the container.
+  //   Stores auth tokens (.credentials.json), session state, plan history,
+  //   plugin cache, and MCP server config. Without this, every
+  //   `devcontainer rebuild` wipes login state and forces re-authentication.
+  //
+  //   CLAUDE_CONFIG_DIR (set in containerEnv below) redirects the Claude Code
+  //   config file (~/.claude.json by default) into this same directory so that
+  //   ALL Claude Code state — including the OAuth session — lives here.
+  //
+  //   Uses a named Docker volume (matching Anthropic's reference devcontainer)
+  //   scoped to ${devcontainerId} so each devcontainer instance gets its own
+  //   isolated volume.
+  //
+  //   To clear auth state intentionally:
+  //     docker volume rm <volume-name>   (find name via: docker volume ls | grep claude-code-config)
+  //
+  //   Reference: https://github.com/anthropics/claude-code/blob/main/.devcontainer/devcontainer.json#L46
+  "mounts": [
+    "source=claude-code-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
+  ],
+
+  // VSCode-specific configuration.
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // Claude Code — agentic AI assistant integrated into the editor
+        "anthropic.claude-code",
+        // Python language support
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        // Ruff: fast linter and formatter for Python
+        "charliermarsh.ruff",
+        // TOML support (pyproject.toml, etc.)
+        "tamasfe.even-better-toml",
+        // YAML support (config.yaml, build.yaml, devcontainer.json adjacent files)
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        // Point VSCode to the uv-managed virtualenv created in postCreateCommand.
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        // Ruff as formatter + lint-on-save
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+          }
+        },
+        "python.analysis.typeCheckingMode": "basic",
+        // Disable Pylance's linting — Ruff handles it to avoid duplicate diagnostics
+        "pylance.disableLinting": true
+      }
+    }
+  },
+
+  // Forward port 8000 (MCP server) to the host.
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "MCP Server",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // Runs once after the container is first created (not on every rebuild).
+  // Installs Python dependencies from uv.lock into .venv, and configures
+  // VS Code as the default git editor so interactive commands (git commit --amend,
+  // git rebase -i, etc.) open VS Code instead of a terminal editor.
+  "postCreateCommand": "uv sync && git config --global core.editor 'code --wait'",
+
+  // Runs on every container start (including after rebuild).
+  // Starts the Docker daemon explicitly — the docker-in-docker feature installs
+  // dockerd but skips its own lifecycle hook when a custom postCreateCommand is
+  // present. See .devcontainer/post-start.sh for details.
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+
+  // Environment variables — loaded from the host environment at container creation.
+  // For local dev, set these in your shell profile OR create a .env file in the
+  // project root (see .env.example). The server's load_dotenv() will pick up .env
+  // automatically at runtime; these containerEnv entries make them available to
+  // VSCode launch configs and the integrated terminal.
+  "containerEnv": {
+    "LOG_LEVEL": "debug",
+    "MCP_PORT": "8000",
+    // Redirect Claude Code's config file into the volume-mounted ~/.claude/ directory.
+    // By default Claude Code writes ~/.claude.json (home dir) separately from
+    // ~/.claude/ (directory). Setting this env var tells Claude Code to store
+    // everything — including the OAuth session — inside ~/.claude/, which IS
+    // covered by the persistent volume. Without this, auth is lost on every rebuild.
+    // Reference: https://github.com/anthropics/claude-code/tree/main/.devcontainer
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude"
+  },
+
+  // Ensure the Claude Code native binary is on PATH.
+  // The installer places it in ~/.local/bin and updates .bashrc, but
+  // non-interactive shells (e.g., VS Code tasks) need this explicit entry.
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}"
+  },
+
+  "remoteUser": "vscode"
+}

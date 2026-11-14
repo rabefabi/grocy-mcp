@@ -1,0 +1,71 @@
+# docker-compose.grocy-test.yml — Grocy test instance
+#
+# Spins up a self-contained Grocy instance for integration testing.
+# The Grocy MCP server (src/grocy_mcp/) points at this instance via .env.grocy.test.
+#
+# Usage:
+#   docker compose -f docker-compose.grocy-test.yml up -d --wait   # start and wait for healthy
+#   docker compose -f docker-compose.grocy-test.yml down -v        # tear down + remove volumes
+#
+# Or use the convenience wrapper:
+#   just grocy-up
+#   just grocy-down
+#   just grocy-status
+#
+# Getting an API token:
+#   just grocy-token
+#
+# Notes:
+#   Grocy uses SQLite by default (no separate DB container needed).
+#   API keys are managed via the web UI or database directly.
+#   Default credentials: admin / admin (changeable in web UI).
+
+name: grocy-test
+
+services:
+
+  # ── Grocy application ────────────────────────────────────────────────────
+  grocy:
+    image: linuxserver/grocy:latest
+    container_name: grocy-test
+    restart: unless-stopped
+    ports:
+      - "9283:80"
+    environment:
+      # LinuxServer.io container settings
+      PUID: 1000
+      PGID: 1000
+      TZ: UTC
+      
+      # Grocy configuration
+      GROCY_CULTURE: en
+      GROCY_CURRENCY: USD
+      
+      # Feature flags (enable stock, recipes, shopping list for testing)
+      GROCY_FEATURE_FLAG_STOCK: "true"
+      GROCY_FEATURE_FLAG_SHOPPINGLIST: "true"
+      GROCY_FEATURE_FLAG_RECIPES: "true"
+      GROCY_FEATURE_FLAG_CHORES: "false"
+      GROCY_FEATURE_FLAG_TASKS: "false"
+      GROCY_FEATURE_FLAG_BATTERIES: "false"
+      GROCY_FEATURE_FLAG_EQUIPMENT: "false"
+      GROCY_FEATURE_FLAG_CALENDAR: "false"
+      
+    volumes:
+      - grocy_data:/config
+    networks:
+      - grocy-test-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  grocy-test-net:
+    driver: bridge
+
+volumes:
+  grocy_data:
+    driver: local
