@@ -25,3 +25,17 @@ Claude works in Dev. Run the server against production Grocy only when the user 
 - **Skills reference MCP tools**: skills name tools (`get_stock(location_name=...)`), never raw API endpoints. When a tool is added or renamed, change the server first, then the skill.
 - **Status quo outside `docs/`**: code, config, comments and READMEs describe the current state. History belongs in commits, the changelog and ADRs.
 - **Single source of truth**: each fact lives in one place (issue, doc, or chat reply); the others link to it.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues in `rabefabi/grocy-mcp`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical labels, unrenamed (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
