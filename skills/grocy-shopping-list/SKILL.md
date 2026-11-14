@@ -27,7 +27,7 @@ Grocy shopping lists are product-based, not food/ingredient-based. Each shopping
 
 ### Shopping List Queries
 
-- `get_shopping_list()` — get all items on the current shopping list. Returns product names, amounts, and notes.
+- `get_shopping_list()` — get all items on the current shopping list. Returns product names, unit names, amounts, and notes.
 
 ### Shopping List Operations
 

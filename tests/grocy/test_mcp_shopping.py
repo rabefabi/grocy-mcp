@@ -87,3 +87,67 @@ class TestGrocyShoppingMCP:
                 api_delete(f"/api/objects/recipes/{recipe_id}")
             if product_id is not None:
                 api_delete(f"/api/objects/products/{product_id}")
+
+
+class TestShoppingListNames:
+    @pytest.mark.asyncio
+    async def test_item_carries_product_and_unit_name(
+        self,
+        call_tool,
+        api_get,
+        api_post,
+        api_delete,
+        create_product_api,
+        default_qu_id,
+        name_factory,
+    ):
+        product_name = name_factory("Crème fraîche Öl 茶")
+        unit_name = api_get(f"/api/objects/quantity_units/{default_qu_id}")["name"]
+        product_id = None
+        item_id = None
+
+        try:
+            product_id = int(create_product_api(product_name)["id"])
+            created = api_post(
+                "/api/objects/shopping_list",
+                {"product_id": product_id, "amount": 2, "qu_id": default_qu_id},
+            )
+            item_id = int(created["created_object_id"])
+
+            items = await call_tool("get_shopping_list")
+            item = next(i for i in items if int(i["id"]) == item_id)
+
+            assert item["product_id"] == product_id
+            assert item["product_name"] == product_name
+            assert item["qu_id"] == default_qu_id
+            assert item["unit_name"] == unit_name
+        finally:
+            if item_id is not None:
+                api_delete(f"/api/objects/shopping_list/{item_id}")
+            if product_id is not None:
+                api_delete(f"/api/objects/products/{product_id}")
+
+    @pytest.mark.asyncio
+    async def test_note_only_item_has_null_names(
+        self, call_tool, api_post, api_delete, name_factory
+    ):
+        note = name_factory("note-only")
+        item_id = None
+
+        try:
+            created = api_post(
+                "/api/objects/shopping_list", {"note": note, "amount": 1}
+            )
+            item_id = int(created["created_object_id"])
+
+            items = await call_tool("get_shopping_list")
+            item = next(i for i in items if int(i["id"]) == item_id)
+
+            assert item["note"] == note
+            assert item["product_id"] is None
+            assert item["product_name"] is None
+            assert item["qu_id"] is None
+            assert item["unit_name"] is None
+        finally:
+            if item_id is not None:
+                api_delete(f"/api/objects/shopping_list/{item_id}")

@@ -31,6 +31,10 @@ if TYPE_CHECKING:
 log = logging.getLogger("grocy_mcp")
 
 
+def _names_by_id(entities: list[dict[str, Any]]) -> dict[Any, str]:
+    return {entity["id"]: entity["name"] for entity in entities}
+
+
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register shopping list tools."""
 
@@ -40,10 +44,20 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         Get the current shopping list.
 
         Returns:
-            List of shopping list items with product name, amount, and notes
+            List of items with id, shopping_list_id, product_id, product_name,
+            qu_id, unit_name, amount, note, and done. product_name and
+            unit_name are null when the item has no product or unit
+            (note-only items).
         """
-        raw = client.get("/api/objects/shopping_list")
-        return shape_response(raw, _SHOPPING_LIST_KEEP)
+        items = shape_response(
+            client.get("/api/objects/shopping_list"), _SHOPPING_LIST_KEEP
+        )
+        product_names = _names_by_id(client.get("/api/objects/products"))
+        unit_names = _names_by_id(client.get("/api/objects/quantity_units"))
+        for item in items:
+            item["product_name"] = product_names.get(item.get("product_id"))
+            item["unit_name"] = unit_names.get(item.get("qu_id"))
+        return items
 
     @mcp.tool(annotations=WRITE)
     def add_to_shopping_list(
