@@ -12,6 +12,10 @@ a change in `X` adds features or contains breaking changes, so read it first.
 - `get_meal_plan` returns the recipe name and product name next to their IDs.
 - `get_products` returns the location, product group, parent product and unit names next to their IDs.
 
+### Changed
+
+- **Breaking:** `get_stock` returns one flat row per product and location, with product, location and unit names. Stock entries in the same location are summed and report the earliest best-before date. The nested `product` object and the raw stock entry fields are gone.
+
 ## 0.2.0 – 2026-11-14
 
 ### Added

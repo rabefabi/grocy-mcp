@@ -8,70 +8,81 @@ STOCK_NOISE_FIELDS = {"stock_id", "shopping_location_id", "row_created_timestamp
 
 
 def _total_amount(stock_rows: list[dict[str, Any]], product_id: int) -> float:
-    total = 0.0
-    for row in stock_rows:
-        pid = row.get("product_id")
-        if pid is None and isinstance(row.get("product"), dict):
-            pid = row["product"].get("id")
-        if pid != product_id:
-            continue
-
-        amount = row.get("amount")
-        if amount is None:
-            amount = row.get("amount_aggregated")
-        if amount is None:
-            continue
-        total += float(amount)
-    return total
+    return sum(r["amount"] for r in stock_rows if r["product_id"] == product_id)
 
 
 def _total_opened(stock_rows: list[dict[str, Any]], product_id: int) -> float:
-    total = 0.0
-    for row in stock_rows:
-        pid = row.get("product_id")
-        if pid is None and isinstance(row.get("product"), dict):
-            pid = row["product"].get("id")
-        if pid != product_id:
-            continue
-        total += float(row.get("amount_opened") or 0.0)
-    return total
+    return sum(r["amount_opened"] for r in stock_rows if r["product_id"] == product_id)
 
 
-class TestGetStockResponseShape:
+class TestGetStockRows:
     @pytest.mark.asyncio
-    async def test_stock_location_response_excludes_noise_fields(self, call_tool):
-        """Location-filtered stock entries (/api/stock/locations/{id}/entries) carry
-        stock_id, shopping_location_id, and row_created_timestamp — these must be removed.
-        The unfiltered /api/stock path returns aggregated entries that do NOT contain
-        these fields, so this test targets the location-filtered path where the noise
-        actually appears and where the TDD red/green cycle is meaningful."""
-        result = await call_tool("get_stock", location_name="Fridge")
-        if not result:
-            pytest.skip("No stock entries in Fridge; seed data required")
-        first = result[0]
-        # Noise fields must not appear at the top level of location-filtered entries
-        for field in STOCK_NOISE_FIELDS:
-            assert field not in first, f"Noise field '{field}' present in shaped location stock response"
-        # Must include machine-actionable fields
-        assert "product_id" in first
-        assert "amount" in first
-        assert "location_id" in first
+    async def test_flat_rows_summed_per_product_and_location(
+        self,
+        call_tool,
+        api_get,
+        api_delete,
+        create_product_api,
+        default_qu_id,
+        name_factory,
+    ):
+        locations = api_get("/api/objects/locations")
+        if len(locations) < 2:
+            pytest.skip("Two storage locations required; seed data required")
+        main, other = locations[0], locations[1]
+        unit_name = api_get(f"/api/objects/quantity_units/{default_qu_id}")["name"]
+        product_name = name_factory("flat-stock")
+        product_id = None
 
-    @pytest.mark.asyncio
-    async def test_stock_response_excludes_noise_fields(self, call_tool):
-        """Aggregated /api/stock path: noise fields checked at the top level."""
-        result = await call_tool("get_stock")
-        if not result:
-            pytest.skip("No stock entries; seed data required")
-        first = result[0]
-        # Aggregated path does not carry stock_id/shopping_location_id/row_created_timestamp
-        # at the top level — verify product_id and amount are present.
-        assert "product_id" in first
-        assert "amount" in first
-        # Aggregated path includes a nested 'product' sub-object
-        assert "product" in first, "Aggregated stock response must include nested 'product' sub-object"
-        assert isinstance(first["product"], dict), "Nested 'product' must be a dict"
-        assert "name" in first["product"], "Nested product sub-object must include 'name'"
+        try:
+            product_id = int(create_product_api(product_name)["id"])
+            for amount, best_before, location in (
+                (1.0, "2099-05-01", main),
+                (2.0, "2099-04-01", main),
+                (4.0, "2099-06-01", other),
+            ):
+                purchase = await call_tool(
+                    "purchase_product",
+                    product_id=product_id,
+                    amount=amount,
+                    best_before_date=best_before,
+                    location_id=int(location["id"]),
+                )
+                assert purchase.get("status") == "success", purchase
+
+            filtered = await call_tool("get_stock", location_name=main["name"])
+            rows = [r for r in filtered if r["product_id"] == product_id]
+            assert rows == [
+                {
+                    "product_id": product_id,
+                    "product_name": product_name,
+                    "location_id": int(main["id"]),
+                    "location_name": main["name"],
+                    "amount": 3.0,
+                    "amount_opened": 0.0,
+                    "best_before_date": "2099-04-01",
+                    "qu_id": default_qu_id,
+                    "unit_name": unit_name,
+                }
+            ]
+
+            unfiltered = await call_tool("get_stock")
+            rows = sorted(
+                (r for r in unfiltered if r["product_id"] == product_id),
+                key=lambda r: r["amount"],
+            )
+            assert [
+                (r["location_name"], r["amount"], r["best_before_date"]) for r in rows
+            ] == [
+                (main["name"], 3.0, "2099-04-01"),
+                (other["name"], 4.0, "2099-06-01"),
+            ]
+            assert all(set(r) == set(filtered[0]) for r in unfiltered)
+            for field in STOCK_NOISE_FIELDS | {"product"}:
+                assert field not in rows[0]
+        finally:
+            if product_id is not None:
+                api_delete(f"/api/objects/products/{product_id}")
 
 
 class TestGrocyStockMCP:

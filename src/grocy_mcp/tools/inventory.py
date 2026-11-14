@@ -12,40 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from ..utils.annotations import READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name
-from ..utils.shape import shape_response
-
-# Fields to retain in location-filtered stock entries (/api/stock/locations/{id}/entries).
-# These entries are flat dicts (no nested "product" sub-object).
-# The aggregated /api/stock endpoint returns entries WITH a nested "product" sub-object
-# but does NOT carry stock_id, shopping_location_id, or row_created_timestamp at the top level.
-_STOCK_KEEP = {
-    "id",
-    "product_id",
-    "amount",
-    "amount_aggregated",
-    "amount_opened",
-    "best_before_date",
-    "purchased_date",
-    "location_id",
-    "open",
-    "opened_date",
-    "note",
-    "due_type",
-    "value",
-    "product",  # nested sub-object present in aggregated /api/stock entries; shaped via nested_key
-}
-
-# Fields to retain in the nested "product" sub-object present in aggregated /api/stock entries.
-_STOCK_NESTED_PRODUCT_KEEP = {
-    "id",
-    "name",
-    "description",
-    "product_group_id",
-    "qu_id_stock",
-    "location_id",
-    "min_stock_amount",
-    "calories",
-}
+from ..utils.shape import names_by_id
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -53,6 +20,50 @@ if TYPE_CHECKING:
     from ..client import GrocyClient
 
 log = logging.getLogger("grocy_mcp")
+
+
+def _stock_rows(
+    client: GrocyClient, entries: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Sum stock entries into one flat row per product and location.
+
+    amount_opened sums the opened entries; best_before_date is the earliest
+    one. qu_id is the product's stock unit.
+    """
+    if not entries:
+        return []
+    products = {p["id"]: p for p in client.get("/api/objects/products")}
+    location_names = names_by_id(client.get("/api/objects/locations"))
+    unit_names = names_by_id(client.get("/api/objects/quantity_units"))
+
+    rows: dict[tuple[Any, Any], dict[str, Any]] = {}
+    for entry in entries:
+        key = (entry.get("product_id"), entry.get("location_id"))
+        row = rows.get(key)
+        if row is None:
+            product = products.get(entry.get("product_id"), {})
+            qu_id = product.get("qu_id_stock")
+            row = rows[key] = {
+                "product_id": entry.get("product_id"),
+                "product_name": product.get("name"),
+                "location_id": entry.get("location_id"),
+                "location_name": location_names.get(entry.get("location_id")),
+                "amount": 0.0,
+                "amount_opened": 0.0,
+                "best_before_date": None,
+                "qu_id": qu_id,
+                "unit_name": unit_names.get(qu_id),
+            }
+        amount = float(entry.get("amount") or 0)
+        row["amount"] += amount
+        if entry.get("open"):
+            row["amount_opened"] += amount
+        best_before = entry.get("best_before_date")
+        if best_before and (
+            row["best_before_date"] is None or best_before < row["best_before_date"]
+        ):
+            row["best_before_date"] = best_before
+    return list(rows.values())
 
 
 def register(mcp: FastMCP, client: GrocyClient) -> None:
@@ -73,14 +84,16 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             location_id: Direct storage location ID (overrides location_name)
 
         Returns:
-            List of stock entries with product details, amounts, locations, and expiry
+            One row per product and location with product_id, product_name,
+            location_id, location_name, amount, amount_opened,
+            best_before_date (the earliest of the stock entries), qu_id and
+            unit_name (the product's stock unit). With a location filter
+            that is one row per product.
         """
-        # If location_id provided directly, use it (location-filtered path — flat entries)
         if location_id is not None:
             raw = client.get(f"/api/stock/locations/{location_id}/entries")
-            return shape_response(raw, _STOCK_KEEP)
+            return _stock_rows(client, raw)
 
-        # If location_name provided, resolve it first (location-filtered path — flat entries)
         if location_name:
             locations = client.get("/api/objects/locations")
             resolved_location = resolve_by_name(
@@ -94,16 +107,9 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 }
             location_id = int(resolved_location["id"])
             raw = client.get(f"/api/stock/locations/{location_id}/entries")
-            return shape_response(raw, _STOCK_KEEP)
+            return _stock_rows(client, raw)
 
-        # Return all stock if no location filter (aggregated path — entries include nested "product" sub-object)
-        raw = client.get("/api/stock")
-        return shape_response(
-            raw,
-            _STOCK_KEEP,
-            nested_key="product",
-            nested_keep=_STOCK_NESTED_PRODUCT_KEEP,
-        )
+        return _stock_rows(client, client.get("/api/objects/stock"))
 
     @mcp.tool(annotations=READ_ONLY)
     def get_volatile_stock() -> dict[str, Any]:

@@ -71,7 +71,10 @@ Decided in [Names, IDs and response size](https://github.com/rabefabi/grocy-mcp/
 2. **Flat stock rows** — `get_stock` returns one flat row per product on every
    path, including the location filter, where the server sums the stock entries
    per product (earliest best-before date). The nested `product` sub-object
-   goes away, so property 4 no longer applies to `get_stock`.
+   goes away, so property 4 no longer applies to `get_stock`. Without a
+   location filter the rows are per product *and* location, so each row
+   carries one real `location_id` (decided while implementing
+   [#13](https://github.com/rabefabi/grocy-mcp/issues/13)).
 3. **Stock filters and paging** — `get_stock` filters by location, product
    (name or ID) and product group, takes optional `limit`/`offset`, sorts by
    product name, and always returns `{total, items}`, with or without `limit`.
