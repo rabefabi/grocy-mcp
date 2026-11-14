@@ -56,7 +56,7 @@ def _stock_rows(
             }
         amount = float(entry.get("amount") or 0)
         row["amount"] += amount
-        if entry.get("open"):
+        if int(entry.get("open") or 0):  # some Grocy versions send "0"/"1"
             row["amount_opened"] += amount
         best_before = entry.get("best_before_date")
         if best_before and (
