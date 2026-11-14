@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from . import __version__
 from .client import GrocyClient
 
 if TYPE_CHECKING:
@@ -29,10 +30,10 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         try:
             # Try a simple API call to verify connectivity
             client.get("/api/system/info")
-            return JSONResponse({"status": "ok", "grocy": "reachable"})
+            return JSONResponse({"status": "ok", "grocy": "reachable", "version": __version__})
         except Exception as e:
             log.warning("Health check failed: %s", e)
             return JSONResponse(
-                {"status": "degraded", "error": type(e).__name__},
+                {"status": "degraded", "error": type(e).__name__, "version": __version__},
                 status_code=503,
             )

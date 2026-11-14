@@ -24,6 +24,7 @@ Claude works in Dev. Run the server against production Grocy only when the user 
 - **Language-neutral**: users run Grocy in any language. Handle non-ASCII names; seed data and examples use English.
 - **Skills reference MCP tools**: skills name tools (`get_stock(location_name=...)`), never raw API endpoints. When a tool is added or renamed, change the server first, then the skill.
 - **Status quo outside `docs/`**: code, config, comments and READMEs describe the current state. History belongs in commits, the changelog and ADRs.
+- **Changelog**: every user-visible change (`feat`, `fix`, breaking) adds a line under `Unreleased` in `CHANGELOG.md` in the same commit. Versioning and release procedure: ADR-058 and the `grocy-mcp-build-release` skill.
 - **Single source of truth**: each fact lives in one place (issue, doc, or chat reply); the others link to it.
 
 ## Agent skills

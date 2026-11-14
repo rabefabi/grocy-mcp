@@ -43,7 +43,9 @@ Thumbs.db
 docker-compose.override.yml
 
 ## Claude
-.claude/
+.claude/*
+!.claude/skills/
+.claude/skills/ponytail/
 .mcp.json
 .vscode/
 

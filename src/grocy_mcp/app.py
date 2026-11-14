@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from . import health
+from . import __version__, health
 from .client import GrocyClient
 from .config import get_settings, setup_logging
 from .tools import register_all
@@ -44,6 +44,9 @@ def create_app() -> FastMCP:
         host="0.0.0.0",
         port=settings.mcp_port,
     )
+
+    # FastMCP has no version parameter; without this serverInfo reports the mcp SDK version.
+    mcp._mcp_server.version = __version__
 
     client = GrocyClient()
     register_all(mcp, client)
