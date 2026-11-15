@@ -5,8 +5,9 @@ description: >
   viewing weekly meal plans, and removing planned meals. Use this skill whenever
   the user wants to plan meals for a day or week, asks "what's for dinner this
   week", wants to add a recipe to a specific day, or needs to modify an existing
-  meal plan. Also trigger when the user says "plan dinner for Monday", "show me
-  this week's plan", "remove Tuesday's lunch", or discusses meal prep. For
+  meal plan, or says a planned recipe was cooked. Also trigger when the user
+  says "plan dinner for Monday", "show me this week's plan", "remove Tuesday's
+  lunch", "we cooked the curry", or discusses meal prep. For
   finding recipes to add to the plan, use grocy-recipe-discovery. For shopping
   list generation from the plan, use grocy-shopping-list.
 ---
@@ -35,6 +36,10 @@ Load the **grocy-household-profile** skill for: dietary settings and any custom 
 
 - `create_meal_plan_entry(recipe_id=..., recipe_name=..., date=..., type=...)` — add a recipe to the meal plan. Date format: "YYYY-MM-DD". Type is optional (e.g., "breakfast", "lunch", "dinner").
 - `delete_meal_plan_entry(entry_id=...)` — remove a meal plan entry. **Get entry_id from `get_meal_plan()` response.**
+
+### After Cooking
+
+- `consume_recipe(recipe_name=..., recipe_id=..., servings=...)` — book a cooked recipe out of stock: Grocy deducts every ingredient, scaled to `servings`. Use it when the user says they cooked a recipe; don't call `consume_product` per ingredient.
 
 ## Workflow: View Meal Plan
 
@@ -93,6 +98,15 @@ Agent: "Which meal? Breakfast, lunch, or dinner?"
 User: "Dinner"
 Agent: create_meal_plan_entry(recipe_name="Pasta Carbonara", date="2024-04-15", type="dinner")
 ```
+
+## Workflow: Recipe Was Cooked
+
+```
+User: "We had the curry tonight, all 4 servings"
+Agent: consume_recipe(recipe_name="Chicken Curry", servings=4)
+```
+
+Ask for the servings if the user doesn't say; the meal plan entry's servings are a good default. Grocy books out only what is in stock and does not report missing ingredients, so if the recipe might not have been fully in stock, check `get_recipes_fulfillment(recipe_name=...)` first and tell the user what was missing.
 
 ## Workflow: Modify Plan
 
@@ -158,6 +172,7 @@ A typical weekly planning session:
 | "Plan dinner for Monday" | `create_meal_plan_entry(date="Monday", type="dinner", ...)` |
 | "Remove Tuesday lunch" | Find entry → `delete_meal_plan_entry(entry_id=...)` |
 | "Plan meals for the week" | Interactive workflow: suggest → confirm → create |
+| "We cooked [recipe]" | `consume_recipe(recipe_name="...", servings=...)` |
 
 ## Date Handling
 

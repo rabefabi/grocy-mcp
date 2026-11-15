@@ -2,12 +2,13 @@
 name: grocy-inventory-management
 description: >
   Track pantry inventory in Grocy. Handles viewing stock by location, logging
-  grocery purchases, consuming products, marking products as opened, and
-  identifying expiring items. Use this skill whenever the user wants to check
+  grocery purchases, consuming products, marking products as opened, moving
+  stock between locations, and identifying expiring items. Use this skill whenever the user wants to check
   what's in their fridge/freezer/pantry, log groceries, record consumption,
   mark items as opened, or check what's about to expire. Also trigger when the
   user says "I just went shopping", "what's in my fridge", "what's expiring",
-  "I used the milk", "I opened the yogurt", or discusses any stock management.
+  "I used the milk", "I opened the yogurt", "I moved the chicken to the
+  fridge", or discusses any stock management.
   For creating new products, use the grocy-product-management skill instead.
   For recipe-related searches, use the grocy-recipe-discovery skill.
 ---
@@ -47,6 +48,7 @@ All interactions with Grocy go through MCP tools — never call raw API endpoint
 - `purchase_product(product_name=..., product_id=..., amount=..., best_before_date=..., location_name=..., location_id=..., price=...)` — log a purchase. Creates a stock entry with expiry date.
 - `consume_product(product_name=..., product_id=..., amount=..., spoiled=...)` — log consumption or waste. If `spoiled=True`, records as waste rather than regular consumption.
 - `open_product(product_name=..., product_id=..., amount=...)` — mark a product as opened. Triggers the "days after open" countdown if configured on the product.
+- `transfer_product(product_name=..., product_id=..., amount=..., from_location=..., to_location=...)` — move stock from one location to another (locations by name or ID). Use it when the user moves food, e.g. from the freezer to the fridge to thaw; don't consume and re-purchase, which would lose the original dates.
 
 ### Lookups
 
@@ -149,6 +151,17 @@ Agent: open_product(product_name="Yogurt", amount=1)
 
 This is important because Grocy can track "days after open" expiry separately from the original best-before date.
 
+### Moving Stock
+
+When the user moves food between locations:
+
+```
+User: "I took the chicken out of the freezer to thaw"
+Agent: transfer_product(product_name="Chicken breast", amount=1, from_location="Freezer", to_location="Refrigerator")
+```
+
+Check the amount in the source location first with `get_stock(product_name=..., location_name=...)` if the user doesn't say how much.
+
 ## Known Limitations
 
 ### No Stock Entry Updates
@@ -194,6 +207,7 @@ get_stock(status="expiring")  # Confirm expiring items flagged correctly
 | "I used [item]" | `consume_product(product_name="[item]")` |
 | "I threw out [item]" | `consume_product(product_name="[item]", spoiled=True)` |
 | "I opened [item]" | `open_product(product_name="[item]")` |
+| "I moved [item] to the fridge" | `transfer_product(product_name="[item]", from_location=..., to_location="Refrigerator")` |
 
 ## Error Handling
 
