@@ -97,12 +97,15 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         product_id: int | None = None,
         product_group_name: str = "",
         product_group_id: int | None = None,
-    ) -> list[dict[str, Any]] | dict[str, Any]:
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> dict[str, Any]:
         """
         Get current stock in the pantry.
 
         Optionally filter by location, product and product group, each by name
-        or ID. The filters combine.
+        or ID. The filters combine. Rows are sorted by product name; limit and
+        offset page through them.
 
         Args:
             location_name: Storage location name (e.g., "Fridge", "Freezer")
@@ -114,14 +117,19 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             product_group_name: Product group name (e.g., "Dairy")
             product_group_id: Product group ID; if given with
                               product_group_name, both must name the same group
+            limit: Maximum number of rows to return; all rows if omitted
+            offset: Number of rows to skip before the first returned row
 
         Returns:
-            One row per product and location with product_id, product_name,
-            location_id, location_name, amount, amount_opened,
-            best_before_date (the earliest of the stock entries), qu_id and
-            unit_name (the product's stock unit). With a location filter
-            that is one row per product.
+            {total, items}: total counts the rows after filtering and before
+            paging. items holds one row per product and location with
+            product_id, product_name, location_id, location_name, amount,
+            amount_opened, best_before_date (the earliest of the stock
+            entries), qu_id and unit_name (the product's stock unit). With a
+            location filter that is one row per product.
         """
+        if offset < 0 or (limit is not None and limit < 0):
+            return {"error": "limit and offset must not be negative"}
         resolved_location = resolve_object(
             client, "locations", location_name, location_id, entity_label="location"
         )
@@ -148,12 +156,20 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             )
         else:
             raw = client.get("/api/objects/stock")
-        return _stock_rows(
+        rows = _stock_rows(
             client,
             raw,
             product_id=_int_or_none(resolved_product["id"]),
             product_group_id=_int_or_none(resolved_group["id"]),
         )
+        rows.sort(
+            key=lambda r: (
+                (r["product_name"] or "").casefold(),
+                (r["location_name"] or "").casefold(),
+            )
+        )
+        end = None if limit is None else offset + limit
+        return {"total": len(rows), "items": rows[offset:end]}
 
     @mcp.tool(annotations=READ_ONLY)
     def get_volatile_stock() -> dict[str, Any]:

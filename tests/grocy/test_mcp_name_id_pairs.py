@@ -108,7 +108,9 @@ class TestLocationPair:
         )
         assert match.get("status") == "success", match
 
-        stock = await call_tool("get_stock", location_name=main["name"])
+        stock = (await call_tool("get_stock", location_name=main["name"]))[
+            "items"
+        ]
         stock_mismatch = await call_tool(
             "get_stock", location_name=main["name"], location_id=int(other["id"])
         )

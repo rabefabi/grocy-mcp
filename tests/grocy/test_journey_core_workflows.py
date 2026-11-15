@@ -39,7 +39,7 @@ class TestGrocyCoreJourney:
                 await call_tool("purchase_product", product_id=product_id, amount=5.0)
             ).get("status") == "success"
 
-            stock_after_purchase = await call_tool("get_stock")
+            stock_after_purchase = (await call_tool("get_stock"))["items"]
             total_after_purchase = _sum_for_product(
                 stock_after_purchase, product_id, "amount"
             )
@@ -49,7 +49,7 @@ class TestGrocyCoreJourney:
                 await call_tool("open_product", product_id=product_id, amount=2.0)
             ).get("status") == "success"
 
-            stock_after_open = await call_tool("get_stock")
+            stock_after_open = (await call_tool("get_stock"))["items"]
             opened_after_open = _sum_for_product(
                 stock_after_open, product_id, "amount_opened"
             )
@@ -59,7 +59,7 @@ class TestGrocyCoreJourney:
                 await call_tool("consume_product", product_id=product_id, amount=1.5)
             ).get("status") == "success"
 
-            stock_after_consume = await call_tool("get_stock")
+            stock_after_consume = (await call_tool("get_stock"))["items"]
             total_after_consume = _sum_for_product(
                 stock_after_consume, product_id, "amount"
             )

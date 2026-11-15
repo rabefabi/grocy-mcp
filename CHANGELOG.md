@@ -17,6 +17,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 - Tools that take a name and an ID for the same product, location, unit or recipe return an error with the candidate matches when both are passed and the name does not resolve uniquely to that ID. Before, the ID won silently.
 - `get_stock` returns one flat row per product and location, with product, location and unit names. Stock entries in the same location are summed and report the earliest best-before date, which makes the response much smaller. Purchase dates, notes, the best-before date of each single entry, the minimum stock amount and amounts summed over sub-products are no longer returned.
+- `get_stock` returns `{total, items}` instead of a bare list, sorted by product name, and pages with `limit` and `offset`. `total` counts the matching rows before paging.
 
 ### Fixed
 
