@@ -29,7 +29,13 @@ or whether they should read what changed first.
 3. **Keep a Changelog, in English, written for users.** `Unreleased` is
    maintained continuously by the coding agent and reviewed by the human at
    merge or before push. A release only renames its heading. Breaking changes
-   carry a **Breaking:** prefix. Development-only changes go under `Internal`.
+   carry a **Breaking:** prefix. A change is breaking when an MCP client or
+   add-on user has to act after updating (change a config, a prompt, or a
+   call that did the right thing before). A new response shape an agent
+   adapts to on its own is not breaking, nor is an error where the server
+   used to do the wrong thing silently; information a tool no longer returns
+   is still listed under `Changed` or `Removed`.
+   Development-only changes go under `Internal`.
 4. **The bump follows the changelog.** Anything under `Added`, `Changed` or
    `Removed` bumps `X`; `Fixed` and `Internal` alone bump `Y`.
 5. **Releases are tagged.** `vX.Y.Z` on the release commit on `main`, plus a

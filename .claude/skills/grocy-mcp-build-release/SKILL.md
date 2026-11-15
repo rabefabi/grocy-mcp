@@ -22,7 +22,8 @@ For every `feat`, `fix` or breaking change, add a line under `## Unreleased` in
 - Write for a Home Assistant user reading the update dialog: what changed for
   them, not which function. English, one line each, no commit jargon.
 - A breaking change goes under `Changed` or `Removed`, starts with
-  **Breaking:** and says what the user has to do.
+  **Breaking:** and says what the user has to do. ADR-058 point 3 defines
+  what counts as breaking.
 - `Internal` is for development-only changes worth finding later (dev
   environment, build setup). Not every `docs`/`test` commit belongs there.
 - Skill changes in `skills/` count like tool changes.
