@@ -34,7 +34,7 @@ Each Grocy product has:
 
 ### Product Queries
 
-- `get_products(query=...)` — search existing products by name. Each product carries names next to its IDs: `location_name`, `product_group_name`, `parent_product_name`, and `qu_stock_name`/`qu_purchase_name`/`qu_consume_name` for the three units.
+- `get_products(query=...)` — search existing products by name. Each product carries names next to its IDs: `location_name`, `product_group_name`, `parent_product_name`, and `qu_stock_name`/`qu_purchase_name`/`qu_consume_name` for the three units. With `details=True` each product also carries `unit_conversions`: `from_qu_id`/`from_qu_name`, `to_qu_id`/`to_qu_name` and `factor` (1 from unit = factor to units); `product_id: null` marks a conversion that applies to all products. Narrow `query` before asking for details.
 - `lookup_product_openfoodfacts(query=..., barcode=...)` — search OpenFoodFacts for product info (nutrition, images)
 
 ### Product Operations
@@ -151,7 +151,7 @@ Grocy distinguishes three unit types:
 
 ### Setting Up Conversions
 
-If purchase and consume units differ from stock:
+If purchase and consume units differ from stock, first check what exists with `get_products(query="Butter", details=True)`, then create the missing conversions:
 
 ```
 Agent: create_quantity_unit_conversion(

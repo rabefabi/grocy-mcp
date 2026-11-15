@@ -14,6 +14,7 @@ REMOVED_TOOLS = {
     "match_ingredient",
     "add_recipe_ingredient",
     "get_recipe_fulfillment",
+    "get_quantity_unit_conversions",
 }
 
 

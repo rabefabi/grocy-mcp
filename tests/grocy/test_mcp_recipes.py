@@ -455,3 +455,81 @@ class TestGetRecipesFulfillment:
         finally:
             for path in cleanup:
                 api_delete(path)
+
+
+class TestGetProductsDetails:
+    @pytest.mark.asyncio
+    async def test_details_add_unit_conversions_with_names(
+        self, call_tool, api_get, api_post, api_delete, name_factory
+    ):
+        units = {u["name"]: u for u in api_get("/api/objects/quantity_units")}
+        if not {"g", "kg"} <= set(units):
+            pytest.skip("Units g and kg required; seed data required")
+        g, kg = units["g"], units["kg"]
+        product_name = name_factory("conversions")
+        cleanup: list[str] = []
+
+        try:
+            product_id = int(
+                api_post(
+                    "/api/objects/products",
+                    {
+                        "name": product_name,
+                        "qu_id_stock": int(g["id"]),
+                        "qu_id_purchase": int(kg["id"]),
+                        "qu_id_consume": int(g["id"]),
+                        "location_id": int(api_get("/api/objects/locations")[0]["id"]),
+                    },
+                )["created_object_id"]
+            )
+            cleanup.append(f"/api/objects/products/{product_id}")
+            existing = api_get(
+                "/api/objects/quantity_unit_conversions",
+                params={"query[]": f"product_id={product_id}"},
+            )
+            conversion = next(
+                (
+                    c
+                    for c in existing
+                    if int(c["from_qu_id"]) == int(kg["id"])
+                    and int(c["to_qu_id"]) == int(g["id"])
+                ),
+                None,
+            )
+            if conversion is None:
+                conversion_id = int(
+                    api_post(
+                        "/api/objects/quantity_unit_conversions",
+                        {
+                            "from_qu_id": int(kg["id"]),
+                            "to_qu_id": int(g["id"]),
+                            "factor": 1000,
+                            "product_id": product_id,
+                        },
+                    )["created_object_id"]
+                )
+                cleanup.insert(
+                    0, f"/api/objects/quantity_unit_conversions/{conversion_id}"
+                )
+                conversion = api_get(
+                    f"/api/objects/quantity_unit_conversions/{conversion_id}"
+                )
+
+            short = await call_tool("get_products", query=product_name)
+            assert "unit_conversions" not in short[0]
+
+            detailed = await call_tool("get_products", query=product_name, details=True)
+            conversions = detailed[0]["unit_conversions"]
+            assert {
+                "id": int(conversion["id"]),
+                "product_id": product_id,
+                "from_qu_id": int(kg["id"]),
+                "from_qu_name": "kg",
+                "to_qu_id": int(g["id"]),
+                "to_qu_name": "g",
+                "factor": conversion["factor"],
+            } in conversions
+            assert all(c["product_id"] in (product_id, None) for c in conversions)
+        finally:
+            for path in cleanup:
+                api_delete(path)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
+from ..utils.annotations import DESTRUCTIVE, WRITE
 from ..utils.resolve import (
     resolution_error,
     resolve_by_name,
@@ -270,16 +270,6 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "error": str(exc),
                 "suggestion": "Verify product_id and updatable fields",
             }
-
-    @mcp.tool(annotations=READ_ONLY)
-    def get_quantity_unit_conversions(
-        product_id: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """List quantity-unit conversions globally or for a specific product."""
-        params: dict[str, Any] = {}
-        if product_id is not None:
-            params["query[]"] = f"product_id={product_id}"
-        return client.get("/api/objects/quantity_unit_conversions", params=params)
 
     @mcp.tool(annotations=WRITE)
     def create_quantity_unit_conversion(

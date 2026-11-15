@@ -34,17 +34,23 @@ _PRODUCT_KEEP = {
 }
 
 
+_CONVERSION_KEEP = {"id", "product_id", "from_qu_id", "to_qu_id", "factor"}
+
+
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register lookup tools."""
 
     @mcp.tool(annotations=READ_ONLY)
-    def get_products(query: str = "") -> list[dict[str, Any]]:
+    def get_products(query: str = "", details: bool = False) -> list[dict[str, Any]]:
         """
         Search for products by name.
 
         Args:
             query: Search term to filter products by name (case-insensitive).
                    Leave empty to list all products.
+            details: Also return each product's unit conversions. Narrow the
+                     query first; details for every product make a large
+                     response.
 
         Returns:
             List of products with id, name, description, active,
@@ -52,7 +58,11 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             qu_id_stock, qu_stock_name, qu_id_purchase, qu_purchase_name,
             qu_id_consume, qu_consume_name, parent_product_id,
             parent_product_name, min_stock_amount, default_best_before_days,
-            and calories. A null ID gives a null name.
+            and calories. A null ID gives a null name. With details, each
+            product also carries unit_conversions: id, product_id (null for
+            a conversion that applies to all products), from_qu_id,
+            from_qu_name, to_qu_id, to_qu_name and factor (1 from unit =
+            factor to units).
         """
         # Grocy API does not support query param on /api/objects/products
         # Fetch all and filter client-side
@@ -83,6 +93,22 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 product[f"qu_{role}_name"] = unit_names.get(
                     product.get(f"qu_id_{role}")
                 )
+        if details:
+            conversions = shape_response(
+                client.get("/api/objects/quantity_unit_conversions"),
+                _CONVERSION_KEEP,
+            )
+            for conversion in conversions:
+                for end in ("from", "to"):
+                    conversion[f"{end}_qu_name"] = unit_names.get(
+                        conversion.get(f"{end}_qu_id")
+                    )
+            for product in shaped:
+                product["unit_conversions"] = [
+                    c
+                    for c in conversions
+                    if c.get("product_id") in (None, product["id"])
+                ]
         return shaped
 
     @mcp.tool(annotations=READ_ONLY)

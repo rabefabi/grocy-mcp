@@ -13,6 +13,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 - `get_products` returns the location, product group, parent product and unit names next to their IDs.
 - `get_stock` filters by product and by product group, by name or ID, alone or combined with the location filter.
 - `create_recipe` takes `ingredients` and creates the recipe with its ingredients in one call, reporting the result of each ingredient.
+- `get_products(details=True)` returns each product's unit conversions, with unit names next to their IDs.
 - `get_recipes_fulfillment` takes a recipe by name or ID and then returns that recipe, also when it cannot be cooked. Every entry carries `recipe_name` next to `recipe_id`.
 - `get_recipes(details=True)` returns each recipe with its ingredients, with product and unit names next to their IDs.
 - `get_master_data` lists locations, quantity units and product groups in one call.
@@ -27,6 +28,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 ### Removed
 
+- `get_quantity_unit_conversions`: use `get_products(query=..., details=True)`.
 - `get_recipe_fulfillment`: use `get_recipes_fulfillment(recipe_name=...)` or `get_recipes_fulfillment(recipe_id=...)`.
 - `match_ingredient` and `add_recipe_ingredient`: pass ingredients to `create_recipe`, or a list (also of one) to `add_recipe_ingredients`.
 - `get_recipe_details`: use `get_recipes(query=..., details=True)`.
