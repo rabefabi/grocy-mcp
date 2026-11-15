@@ -141,27 +141,6 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             log.error("Failed to remove from shopping list: %s", e)
             return {"status": "error", "error": str(e)}
 
-    @mcp.tool(annotations=DESTRUCTIVE)
-    def clear_shopping_list() -> dict[str, Any]:
-        """
-        Clear all items from the shopping list.
-
-        This removes all items in one operation. Be careful!
-
-        Returns:
-            Confirmation that the list was cleared
-        """
-        try:
-            result = client.post("/api/stock/shoppinglist/clear", {})
-            return {
-                "status": "success",
-                "message": "Shopping list cleared",
-                "result": result,
-            }
-        except Exception as e:
-            log.error("Failed to clear shopping list: %s", e)
-            return {"status": "error", "error": str(e)}
-
     @mcp.tool(annotations=WRITE)
     def add_recipe_missing_to_shopping_list(
         recipe_name: str = "",

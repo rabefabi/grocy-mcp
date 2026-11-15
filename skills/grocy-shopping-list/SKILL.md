@@ -33,7 +33,6 @@ Grocy shopping lists are product-based, not food/ingredient-based. Each shopping
 
 - `add_to_shopping_list(product_name=..., product_id=..., amount=..., note=...)` — add a product to the shopping list. Resolves product name to ID automatically.
 - `remove_from_shopping_list(product_name=..., product_id=..., amount=...)` — remove a product from the list. If amount is omitted, removes all units of that product.
-- `clear_shopping_list()` — remove all items from the shopping list. **Destructive — confirm with user first.**
 - `add_recipe_missing_to_shopping_list(recipe_id=..., recipe_name=...)` — add missing ingredients from a recipe to the shopping list. **Grocy calculates what's missing automatically.**
 
 ## Workflow: View Shopping List
@@ -122,12 +121,13 @@ Agent: remove_from_shopping_list(product_name="Milk", amount=1)
 
 ```
 User: "Clear my shopping list"
+Agent: get_shopping_list()
 Agent: "Are you sure you want to remove all 5 items from your shopping list?"
 User: "Yes"
-Agent: clear_shopping_list()
+Agent: remove_from_shopping_list(product_name=...) for each product on the list
 ```
 
-**Always confirm before calling `clear_shopping_list()`.**
+There is no bulk delete: read the list, confirm with the user, then remove each product. Items without a product (note-only items) cannot be removed with the MCP tools; tell the user to delete them in Grocy's web interface.
 
 ## Workflow: Generate from Recipes
 
@@ -173,7 +173,7 @@ User: "I bought everything on the list"
 Agent:
   1. Get current list: get_shopping_list()
   2. Log each purchase: purchase_product(...) for each item (→ grocy-inventory-management)
-  3. Clear the list: clear_shopping_list()
+  3. Remove each bought item: remove_from_shopping_list(product_name=...)
 ```
 
 Or handle item-by-item:
@@ -203,9 +203,9 @@ If the user wants organized shopping:
 | "Add milk" | `add_to_shopping_list(product_name="Milk")` |
 | "Add 2 liters of milk" | `add_to_shopping_list(product_name="Milk", amount=2)` |
 | "Remove eggs" | `remove_from_shopping_list(product_name="Eggs")` |
-| "Clear the list" | Confirm → `clear_shopping_list()` |
+| "Clear the list" | `get_shopping_list()` → confirm → `remove_from_shopping_list()` per product |
 | "Add ingredients for [recipe]" | `add_recipe_missing_to_shopping_list(recipe_name="...")` |
-| "I bought everything" | Log purchases → `clear_shopping_list()` |
+| "I bought everything" | Log purchases → `remove_from_shopping_list()` per product |
 
 ## Error Handling
 

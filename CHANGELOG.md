@@ -23,6 +23,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 ### Removed
 
+- `clear_shopping_list`: to empty the list, read it with `get_shopping_list` and remove each product with `remove_from_shopping_list`.
 - `get_locations`, `get_quantity_units` and `get_product_groups`: use `get_master_data`.
 - `get_volatile_stock`: use `get_stock(status="expiring")` or `get_stock(status="expired")`. Products below their minimum stock amount are no longer listed.
 

@@ -9,6 +9,7 @@ REMOVED_TOOLS = {
     "get_locations",
     "get_quantity_units",
     "get_product_groups",
+    "clear_shopping_list",
 }
 
 
