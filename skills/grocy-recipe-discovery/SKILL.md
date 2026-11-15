@@ -21,23 +21,21 @@ Load the **grocy-household-profile** skill for: dietary settings (allergies, dis
 
 ## Built-in Fulfillment
 
-Grocy calculates recipe fulfillment server-side. The `get_recipes_fulfillment()` tool returns recipes with their fulfillment status — whether all ingredients are in stock, partially in stock, or missing entirely. **Use this instead of manually checking ingredients.**
+Grocy calculates recipe fulfillment server-side. The `get_recipes_fulfillment()` tool returns recipes with their fulfillment status — whether all ingredients are in stock, would be with the shopping list, or how many are missing. **Use this instead of manually checking ingredients.**
 
 ## Available MCP Tools
 
 ### Recipe Queries
 
 - `get_recipes(query=..., details=...)` — search recipes by name. Returns id, name, description (the instructions), servings and type. With `details=True` each recipe also carries its `ingredients` (product, amount, unit, note, group), with names next to the IDs.
-- `get_recipes_fulfillment()` — get all recipes with fulfillment status. Returns which recipes can be made with current stock.
-- `get_recipe_fulfillment(recipe_id=..., recipe_name=...)` — check fulfillment for a specific recipe. Returns ingredient-by-ingredient status.
+- `get_recipes_fulfillment(recipe_name=..., recipe_id=..., include_unfulfillable=...)` — fulfillment status, always as a list of entries with `recipe_id`, `recipe_name`, `need_fulfilled`, `need_fulfilled_with_shopping_list`, `missing_products_count` and `product_names_comma_separated`. Without a recipe it lists the recipes you can cook now; `include_unfulfillable=True` lists all recipes. With a recipe (by name or ID) it returns a one-element list for that recipe, also when it cannot be cooked.
 
 ## Workflow: "What Can I Cook Tonight?"
 
 **Recipe Discovery with Fulfillment**
 
-1. Call `get_recipes_fulfillment()` to get all recipes with stock status
-2. Filter for recipes where `need_fulfilled = true` (all ingredients in stock)
-3. If too few results, include `need_fulfilled_with_shopping = true` (missing 1-2 ingredients)
+1. Call `get_recipes_fulfillment()` to get the recipes with all ingredients in stock
+2. If too few results, call `get_recipes_fulfillment(include_unfulfillable=True)` and add the recipes with a low `missing_products_count`
 4. Apply dietary filters from household profile (client-side)
 5. Present top recommendations
 
@@ -66,7 +64,7 @@ Agent: get_recipes(query="pasta")
 Then optionally check fulfillment for the results:
 
 ```
-Agent: get_recipe_fulfillment(recipe_name="Pasta Carbonara")
+Agent: get_recipes_fulfillment(recipe_name="Pasta Carbonara")
 ```
 
 ## Workflow: "What Can I Make with [Ingredient]?"
@@ -82,22 +80,24 @@ Agent: get_recipe_fulfillment(recipe_name="Pasta Carbonara")
 When the user asks "Can I make [recipe]?":
 
 ```
-Agent: get_recipe_fulfillment(recipe_name="Pasta Carbonara")
+Agent: get_recipes_fulfillment(recipe_name="Pasta Carbonara")
 ```
 
 Response structure:
 ```json
-{
-  "recipe_name": "Pasta Carbonara",
-  "need_fulfilled": true,
-  "missing_products": [],
-  "ingredients": [
-    {"product": "Pasta", "amount": 200, "unit": "g", "in_stock": 500},
-    {"product": "Eggs", "amount": 2, "unit": "Piece", "in_stock": 6},
-    {"product": "Parmesan", "amount": 50, "unit": "g", "in_stock": 100}
-  ]
-}
+[
+  {
+    "recipe_id": 12,
+    "recipe_name": "Pasta Carbonara",
+    "need_fulfilled": 0,
+    "need_fulfilled_with_shopping_list": 0,
+    "missing_products_count": 1,
+    "product_names_comma_separated": "Spaghetti,Eggs,Parmesan,Guanciale"
+  }
+]
 ```
+
+To see which ingredient is missing, compare `get_recipes(query="Pasta Carbonara", details=True)` with `get_stock(product_name=...)`.
 
 ## No Keyword System
 
@@ -143,9 +143,9 @@ For multiple recipes:
 
 | User request | Tool sequence |
 |--------------|---------------|
-| "What can I cook?" | `get_recipes_fulfillment()` → filter `need_fulfilled=true` |
+| "What can I cook?" | `get_recipes_fulfillment()` |
 | "Find pasta recipes" | `get_recipes(query="pasta")` |
-| "Can I make carbonara?" | `get_recipe_fulfillment(recipe_name="Carbonara")` |
+| "Can I make carbonara?" | `get_recipes_fulfillment(recipe_name="Carbonara")` |
 | "Show me vegetarian options" | `get_recipes_fulfillment()` → client-side filter |
 | "Recipes using chicken" | `get_recipes(details=True)` → check ingredients for "chicken" |
 | "Show me the carbonara recipe" | `get_recipes(query="Carbonara", details=True)` |
@@ -162,7 +162,7 @@ If `get_recipes(query=...)` returns empty:
 
 ### Recipe Not Found by Name
 
-If `get_recipe_fulfillment(recipe_name=...)` returns "not found":
+If `get_recipes_fulfillment(recipe_name=...)` returns "not found":
 
 ```json
 {

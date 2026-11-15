@@ -41,14 +41,14 @@ class TestRecipeShape:
         assert len(normal_recipes) > 0, "No recipes with type='normal' found after shaping"
 
     @pytest.mark.asyncio
-    async def test_get_recipe_fulfillment_excludes_noise(self, call_tool, api_get):
+    async def test_get_recipes_fulfillment_excludes_noise(self, call_tool, api_get):
         recipes = api_get("/api/objects/recipes")
         if not recipes:
             pytest.skip("No recipes; seed data required")
         recipe_id = int(recipes[0]["id"])
-        result = await call_tool("get_recipe_fulfillment", recipe_id=recipe_id)
-        if isinstance(result, dict) and result.get("status") == "error":
-            pytest.skip("Recipe fulfillment failed; skip shape check")
+        result = (
+            await call_tool("get_recipes_fulfillment", recipe_id=recipe_id)
+        )[0]
         for field in FULFILLMENT_NOISE:
             assert field not in result, f"Noise field '{field}' present in fulfillment"
         assert "need_fulfilled" in result
@@ -260,9 +260,10 @@ class TestGrocyRecipesMCP:
             assert recipe.get("status") == "success", recipe
             recipe_id = int(recipe["recipe"]["id"])
 
-            fulfillment = await call_tool("get_recipe_fulfillment", recipe_id=recipe_id)
-            assert isinstance(fulfillment, dict)
-            assert "need_fulfilled" in fulfillment or "missing_products" in fulfillment
+            fulfillment = await call_tool(
+                "get_recipes_fulfillment", recipe_id=recipe_id
+            )
+            assert fulfillment[0]["need_fulfilled"] == 0
         finally:
             if recipe_id is not None:
                 api_delete(f"/api/objects/recipes/{recipe_id}")
@@ -408,3 +409,49 @@ class TestCreateRecipeWithIngredients:
         api_delete(f"/api/objects/recipes/{int(result['recipe_id'])}")
         assert result["status"] == "success", result
         assert result["total"] == 0
+
+
+class TestGetRecipesFulfillment:
+    @pytest.mark.asyncio
+    async def test_one_recipe_by_name_or_id_also_when_unfulfillable(
+        self, call_tool, api_delete, create_product_api, name_factory
+    ):
+        recipe_name = name_factory("unfulfillable")
+        cleanup: list[str] = []
+
+        try:
+            product = create_product_api(name_factory("not-in-stock"))
+            cleanup.append(f"/api/objects/products/{product['id']}")
+            created = await call_tool(
+                "create_recipe",
+                name=recipe_name,
+                ingredients=[{"product_id": int(product["id"]), "amount": 1}],
+            )
+            recipe_id = int(created["recipe_id"])
+            cleanup.insert(0, f"/api/objects/recipes/{recipe_id}")
+
+            by_id = await call_tool("get_recipes_fulfillment", recipe_id=recipe_id)
+            assert len(by_id) == 1
+            assert by_id[0]["recipe_id"] == recipe_id
+            assert by_id[0]["recipe_name"] == recipe_name
+            assert by_id[0]["need_fulfilled"] == 0
+            assert by_id[0]["missing_products_count"] == 1
+
+            by_name = await call_tool("get_recipes_fulfillment", recipe_name=recipe_name)
+            assert by_name == by_id
+
+            fulfillable = await call_tool("get_recipes_fulfillment")
+            assert recipe_id not in {r["recipe_id"] for r in fulfillable}
+            assert all(r["need_fulfilled"] == 1 for r in fulfillable)
+
+            everything = await call_tool(
+                "get_recipes_fulfillment", include_unfulfillable=True
+            )
+            assert by_id[0] in everything
+            assert all("recipe_name" in r for r in everything)
+
+            unknown = await call_tool("get_recipes_fulfillment", recipe_name="Zzqx Vwyk")
+            assert unknown["error"]
+        finally:
+            for path in cleanup:
+                api_delete(path)

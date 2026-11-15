@@ -16,7 +16,12 @@ import httpx
 from PIL import Image
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
-from ..utils.resolve import resolve_by_name, resolve_name_and_id, resolve_object
+from ..utils.resolve import (
+    resolution_error,
+    resolve_by_name,
+    resolve_name_and_id,
+    resolve_object,
+)
 from ..utils.shape import names_by_id, shape_response
 
 _RECIPE_KEEP = {
@@ -398,35 +403,49 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
     @mcp.tool(annotations=READ_ONLY)
     def get_recipes_fulfillment(
+        recipe_id: int | None = None,
+        recipe_name: str = "",
         include_unfulfillable: bool = False,
-    ) -> list[dict[str, Any]]:
-        """Get fulfillment status for all recipes."""
-        all_recipes = client.get("/api/recipes/fulfillment")
-        shaped = shape_response(all_recipes, _FULFILLMENT_KEEP)
-        if include_unfulfillable:
-            return shaped
-        return [r for r in shaped if r.get("need_fulfilled") == 1]
+    ) -> list[dict[str, Any]] | dict[str, Any]:
+        """
+        Check which recipes can be cooked with the current stock.
 
-    @mcp.tool(annotations=READ_ONLY)
-    def get_recipe_fulfillment(
-        recipe_id: int | None = None, recipe_name: str = ""
-    ) -> dict[str, Any]:
-        """Get fulfillment status for one recipe."""
-        resolved = _resolve_recipe(client, recipe_id, recipe_name)
+        Without a recipe: the recipes whose ingredients are all in stock, or
+        all recipes with include_unfulfillable. With a recipe (by name or
+        ID): a one-element list for that recipe, also when it cannot be
+        cooked, so you see what is missing.
+
+        Args:
+            recipe_id: Recipe ID; if given with recipe_name, both must name
+                       the same recipe
+            recipe_name: Recipe name
+            include_unfulfillable: Also list recipes that cannot be cooked;
+                                   ignored when a recipe is given
+
+        Returns:
+            List of entries with recipe_id, recipe_name, need_fulfilled,
+            need_fulfilled_with_shopping_list, missing_products_count, costs,
+            costs_per_serving, calories, due_score and
+            product_names_comma_separated.
+        """
+        resolved = resolve_object(
+            client, "recipes", recipe_name, recipe_id, entity_label="recipe"
+        )
         if not resolved["ok"]:
-            return {
-                "status": "error",
-                "error": resolved["error"],
-                "matches": resolved.get("matches", []),
-                "suggestion": resolved.get("suggestion"),
-            }
+            return {"status": "error", **resolution_error(resolved)}
 
-        try:
-            raw = client.get(f"/api/recipes/{int(resolved['id'])}/fulfillment")
-            return shape_response(raw, _FULFILLMENT_KEEP)
-        except Exception as exc:
-            log.error("Failed to get recipe fulfillment: %s", exc)
-            return {"status": "error", "error": str(exc)}
+        if resolved["id"] is not None:
+            entries = [client.get(f"/api/recipes/{int(resolved['id'])}/fulfillment")]
+        else:
+            entries = client.get("/api/recipes/fulfillment")
+            if not include_unfulfillable:
+                entries = [e for e in entries if e.get("need_fulfilled") == 1]
+
+        shaped = shape_response(entries, _FULFILLMENT_KEEP)
+        recipe_names = names_by_id(client.get("/api/objects/recipes"))
+        for entry in shaped:
+            entry["recipe_name"] = recipe_names.get(entry.get("recipe_id"))
+        return shaped
 
     @mcp.tool(annotations=WRITE)
     def consume_recipe(

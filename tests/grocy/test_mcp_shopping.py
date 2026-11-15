@@ -57,8 +57,10 @@ class TestGrocyShoppingMCP:
             recipes = await call_tool("get_recipes")
             assert any(int(r.get("id")) == recipe_id for r in recipes), recipes
 
-            fulfillment = await call_tool("get_recipe_fulfillment", recipe_id=recipe_id)
-            assert isinstance(fulfillment, dict)
+            fulfillment = await call_tool(
+                "get_recipes_fulfillment", recipe_id=recipe_id
+            )
+            assert len(fulfillment) == 1
 
             added = await call_tool(
                 "add_recipe_missing_to_shopping_list", recipe_id=recipe_id

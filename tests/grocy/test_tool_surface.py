@@ -13,6 +13,7 @@ REMOVED_TOOLS = {
     "get_recipe_details",
     "match_ingredient",
     "add_recipe_ingredient",
+    "get_recipe_fulfillment",
 }
 
 

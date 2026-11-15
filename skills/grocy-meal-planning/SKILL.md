@@ -209,7 +209,7 @@ User: "Help me plan dinner for next week"
 
 Agent: "Let's plan dinners for April 15-21. I'll check what you have in stock..."
 
-[calls get_recipes_fulfillment()]
+[calls get_recipes_fulfillment(include_unfulfillable=True)]
 
 Agent: "Here are some recipes you can make with current ingredients:
 1. Pasta Carbonara (4 servings) ✅
