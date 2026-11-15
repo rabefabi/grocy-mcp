@@ -35,11 +35,27 @@ The add-on publishes no port by default, because the MCP endpoint has no authent
 ### Docker (standalone)
 
 ```bash
-cp .env.example .env   # set GROCY_URL and GROCY_API_TOKEN
+cp .env.example .env   # set GROCY_URL, GROCY_API_TOKEN and MCP_BEARER_TOKEN
 docker compose -f docker-compose.grocy-mcp-standalone.yml --env-file .env up -d --build
 ```
 
-The server listens on port **8001**.
+The MCP server has no authentication of its own, so the compose file puts
+[Caddy](https://caddyserver.com) in front of it ([`Caddyfile.standalone`](Caddyfile.standalone)).
+Only Caddy's HTTPS port is published; the MCP server's port stays inside the
+Docker network. Caddy
+
+- terminates TLS. By default the certificate comes from Caddy's own CA, so a
+  client either trusts that CA (`docker compose -f docker-compose.grocy-mcp-standalone.yml cp caddy:/data/caddy/pki/authorities/local/root.crt .`)
+  or skips certificate verification. With `MCP_TLS` set to an email address and
+  `MCP_SITE_ADDRESS` to a public domain that points at the host, Caddy gets a
+  public certificate instead; this needs `MCP_HTTPS_PORT=443`.
+- rejects requests without `Authorization: Bearer <MCP_BEARER_TOKEN>` with `401`.
+  The token has no default; generate one with `openssl rand -hex 32`.
+- rejects clients outside private networks with `403`. `MCP_ALLOWED_IPS` takes
+  other ranges, in Caddy's `remote_ip` syntax.
+
+The endpoint is `https://<MCP_SITE_ADDRESS>:<MCP_HTTPS_PORT>/mcp`, by default
+`https://localhost:8443/mcp`.
 
 ### Local (development)
 
@@ -60,17 +76,21 @@ just grocy-mcp-run staging     # runs against the Grocy in .env
 
 The server speaks **Streamable HTTP** at `http://<host>:<port>/mcp`. A health endpoint is at `/health`.
 
-Example client config:
+Example client config for the standalone Docker setup:
 
 ```json
 {
   "mcpServers": {
-    "grocy": { "type": "http", "url": "http://<host>:8001/mcp" }
+    "grocy": {
+      "type": "http",
+      "url": "https://<host>:8443/mcp",
+      "headers": { "Authorization": "Bearer <MCP_BEARER_TOKEN>" }
+    }
   }
 }
 ```
 
-There is no client authentication. Only expose the server inside a trusted network.
+The server itself has no client authentication: put it behind a proxy that checks a token (Caddy in the standalone setup, nginx for the add-on, see [DOCS.md](DOCS.md#connecting-an-mcp-client)) or only expose it inside a trusted network.
 
 ## Skills
 

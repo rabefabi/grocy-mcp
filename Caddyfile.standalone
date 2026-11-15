@@ -1,0 +1,23 @@
+# Caddy in front of the Grocy MCP server (docker-compose.grocy-mcp-standalone.yml).
+# The MCP server has no authentication of its own; Caddy adds TLS, a bearer
+# token check and a restriction to private networks.
+{
+	# Only HTTPS is published; no HTTP-to-HTTPS redirect listener on port 80.
+	auto_https disable_redirects
+}
+
+{$MCP_SITE_ADDRESS:localhost} {
+	# "internal": certificate from Caddy's own CA. An email address instead
+	# gets a public certificate via ACME (needs a public domain and port 443).
+	tls {$MCP_TLS:internal}
+
+	route {
+		@outside not remote_ip {$MCP_ALLOWED_IPS:private_ranges}
+		respond @outside 403
+
+		@unauthorized not header Authorization "Bearer {$MCP_BEARER_TOKEN}"
+		respond @unauthorized 401
+
+		reverse_proxy grocy-mcp:8001
+	}
+}

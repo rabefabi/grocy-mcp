@@ -1,9 +1,10 @@
-# Grocy MCP server as a standalone HTTP endpoint, e.g. for Open WebUI.
+# Grocy MCP server as a standalone HTTPS endpoint, behind Caddy (Caddyfile.standalone).
 #
-#   cp .env.example .env   # set GROCY_URL and GROCY_API_TOKEN
+#   cp .env.example .env   # set GROCY_URL, GROCY_API_TOKEN and MCP_BEARER_TOKEN
 #   docker compose -f docker-compose.grocy-mcp-standalone.yml --env-file .env up -d --build
 #
-# MCP endpoint: http://<host>:8001/mcp
+# MCP endpoint: https://<MCP_SITE_ADDRESS>:<MCP_HTTPS_PORT>/mcp with the header
+# "Authorization: Bearer <MCP_BEARER_TOKEN>". Only Caddy's port is published.
 
 name: grocy-mcp
 
@@ -15,8 +16,6 @@ services:
       dockerfile: Dockerfile.standalone
     container_name: grocy-mcp
     restart: unless-stopped
-    ports:
-      - "8001:8001"
     environment:
       GROCY_URL: ${GROCY_URL:?Set GROCY_URL in .env}
       GROCY_API_TOKEN: ${GROCY_API_TOKEN:?Set GROCY_API_TOKEN in .env}
@@ -28,3 +27,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: grocy-mcp-caddy
+    restart: unless-stopped
+    depends_on:
+      - grocy-mcp
+    ports:
+      - "${MCP_HTTPS_PORT:-8443}:443"
+    environment:
+      MCP_BEARER_TOKEN: ${MCP_BEARER_TOKEN:?Set MCP_BEARER_TOKEN in .env}
+      MCP_SITE_ADDRESS: ${MCP_SITE_ADDRESS:-localhost}
+      MCP_TLS: ${MCP_TLS:-internal}
+      MCP_ALLOWED_IPS: ${MCP_ALLOWED_IPS:-private_ranges}
+    volumes:
+      - ./Caddyfile.standalone:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+
+volumes:
+  caddy-data:

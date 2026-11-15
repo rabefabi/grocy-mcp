@@ -21,6 +21,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 ### Changed
 
+- **Breaking:** the standalone Docker setup puts Caddy in front of the MCP server, with TLS, a bearer token and a restriction to private networks. Set `MCP_BEARER_TOKEN` in `.env` before updating, and point clients at `https://<host>:8443/mcp` with the token; port 8001 is no longer published.
 - **Breaking:** the add-on no longer publishes the MCP port (8001) on the Home Assistant host by default, because the endpoint has no authentication. The update may remove an existing port mapping, so a connected client loses its connection: re-enable the port in the add-on's network settings, or set up the nginx proxy with a token (see the add-on documentation).
 - Tools that take a name and an ID for the same product, location, unit or recipe return an error with the candidate matches when both are passed and the name does not resolve uniquely to that ID. Before, the ID won silently.
 - `get_stock` returns one flat row per product and location, with product, location and unit names. Stock entries in the same location are summed and report the earliest best-before date, which makes the response much smaller. Purchase dates, notes, the best-before date of each single entry, the minimum stock amount and amounts summed over sub-products are no longer returned.
