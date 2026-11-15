@@ -30,7 +30,7 @@ Tools accept human-readable names and resolve them to Grocy IDs. Ambiguous match
 | `grocy_api_token` | yes      | API key from Grocy (**Settings → Manage API keys**)                  |
 | `log_level`       | no       | `debug`, `info`, `warning`, `error` (default `info`)                 |
 
-The add-on listens on port **8001**. See [DOCS.md](DOCS.md) for add-on details.
+The add-on publishes no port by default, because the MCP endpoint has no authentication. [DOCS.md](DOCS.md#connecting-an-mcp-client) describes how to connect a client: by enabling port **8001** or through nginx with TLS and a token.
 
 ### Docker (standalone)
 

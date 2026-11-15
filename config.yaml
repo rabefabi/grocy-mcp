@@ -16,10 +16,11 @@ startup: services
 boot: auto
 init: false
 
+# Not published by default: the endpoint has no authentication. See DOCS.md.
 ports:
-  8001/tcp: 8001
+  8001/tcp: null
 ports_description:
-  8001/tcp: "MCP server HTTP endpoint (connect clients to /mcp)"
+  8001/tcp: "MCP endpoint /mcp, unauthenticated (off by default, see docs)"
 
 watchdog: "http://[HOST]:[PORT:8001]/health"
 
