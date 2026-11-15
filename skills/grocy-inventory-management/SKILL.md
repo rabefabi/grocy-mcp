@@ -50,9 +50,7 @@ All interactions with Grocy go through MCP tools — never call raw API endpoint
 
 ### Lookups
 
-- `get_locations()` — list all storage locations with IDs
-- `get_quantity_units()` — list all quantity units
-- `get_product_groups()` — list product categories
+- `get_master_data()` — list storage locations, quantity units and product groups with their IDs, in one call
 
 ## Workflow: Check Pantry ("What's in my fridge?")
 
@@ -239,4 +237,4 @@ If `purchase_product()` can't find the location:
 }
 ```
 
-Grocy location names are case-sensitive. Use `get_locations()` to discover exact names.
+Grocy location names are case-sensitive. Use `get_master_data()` to discover exact names.

@@ -6,6 +6,9 @@ from grocy_mcp.app import create_app
 
 REMOVED_TOOLS = {
     "get_volatile_stock",
+    "get_locations",
+    "get_quantity_units",
+    "get_product_groups",
 }
 
 

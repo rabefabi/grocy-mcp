@@ -43,7 +43,7 @@ Load the **grocy-household-profile** skill for: quantity units (to match ingredi
 
 ### Unit Lookups
 
-- `get_quantity_units()` — list available units for ingredient amounts
+- `get_master_data()` — its `quantity_units` list the available units for ingredient amounts
 
 ## Workflow: Import from URL
 
@@ -182,7 +182,7 @@ If not found: Offer to create it (→ grocy-product-management)
 ### Step 3: Match Unit
 
 ```
-Agent: get_quantity_units()
+Agent: get_master_data()  # read quantity_units
 ```
 
 Find the matching unit. Common mappings:

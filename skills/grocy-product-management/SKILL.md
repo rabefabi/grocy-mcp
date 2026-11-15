@@ -44,13 +44,11 @@ Each Grocy product has:
 
 ### Unit Operations
 
-- `get_quantity_units()` — list all available units
 - `create_quantity_unit_conversion(product_id=..., from_qu_id=..., to_qu_id=..., factor=...)` — create a unit conversion for a product
 
 ### Lookups
 
-- `get_locations()` — list storage locations
-- `get_product_groups()` — list product categories
+- `get_master_data()` — list storage locations, quantity units and product groups with their IDs, in one call
 
 ## Workflow: Create a New Product
 
@@ -191,8 +189,8 @@ Use the household profile to suggest defaults:
 | "Create a new product" | Interactive workflow |
 | "Look up [product]" | `lookup_product_openfoodfacts(query="...")` |
 | "Scan barcode 123..." | `lookup_product_openfoodfacts(barcode="...")` |
-| "What units are available?" | `get_quantity_units()` |
-| "What locations exist?" | `get_locations()` |
+| "What units are available?" | `get_master_data()` → `quantity_units` |
+| "What locations exist?" | `get_master_data()` → `locations` |
 
 ## Error Handling
 
@@ -223,7 +221,7 @@ If the specified unit doesn't exist:
 }
 ```
 
-Use `get_quantity_units()` to discover available units.
+Use `get_master_data()` to discover available units.
 
 ### Location Not Found
 
@@ -237,7 +235,7 @@ If the location doesn't exist:
 }
 ```
 
-Use `get_locations()` to discover available locations.
+Use `get_master_data()` to discover available locations.
 
 ### OpenFoodFacts No Results
 

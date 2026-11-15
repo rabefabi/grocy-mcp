@@ -50,10 +50,10 @@ dietary_settings:
   disliked_ingredients: []  # e.g., ["cilantro", "olives"]
 
 # Where food is stored (must match Grocy Location names)
-# Use get_locations() to discover existing locations
+# Use get_master_data() to discover existing locations
 inventory_locations:
   - name: "Refrigerator"
-    grocy_location_id: null  # Fill from get_locations() response
+    grocy_location_id: null  # Fill from the get_master_data() locations
     typical_contents: ["Fresh produce", "Dairy", "Leftovers", "Condiments"]
     default_expiry_days: 7
     is_freezer: false
@@ -69,7 +69,7 @@ inventory_locations:
     is_freezer: false
 
 # Quantity units (must match Grocy QuantityUnit names)
-# Use get_quantity_units() to discover available units
+# Use get_master_data() to discover available units
 quantity_units:
   default_weight: "g"
   default_volume: "ml"
@@ -89,7 +89,7 @@ quantity_units:
       description: "Pre-packaged items"
 
 # Product groups (must match Grocy ProductGroup names)
-# Use get_product_groups() to discover available groups
+# Use get_master_data() to discover available groups
 product_groups:
   - name: "Dairy"
     typical_location: "Refrigerator"
@@ -146,7 +146,7 @@ Best practice:
 Example:
 
 ```
-Agent: get_locations()
+Agent: get_master_data()
 # Returns locations such as:
 # - id=10, name="Gefrierschrank"
 # - id=11, name="Vorratsschrank"
@@ -164,34 +164,20 @@ When another skill says "Load the grocy-household-profile skill", the agent shou
 
 ## Discovering Existing Grocy Configuration
 
-When setting up the profile, discover what already exists in the Grocy instance:
-
-### Step 1: Discover Locations
+When setting up the profile, discover what already exists in the Grocy instance with one call:
 
 ```
-Tool: get_locations()
-Returns: List of {id, name, is_freezer, ...}
+Tool: get_master_data()
+Returns: {
+  locations: [{id, name, is_freezer, ...}],
+  quantity_units: [{id, name, name_plural, description, ...}],
+  product_groups: [{id, name, ...}]
+}
 ```
 
-Map each location to an entry in `inventory_locations`, filling in `grocy_location_id` with the actual ID.
-
-### Step 2: Discover Quantity Units
-
-```
-Tool: get_quantity_units()
-Returns: List of {id, name, description, ...}
-```
-
-Update `quantity_units.common_units` with the actual units available in the instance.
-
-### Step 3: Discover Product Groups
-
-```
-Tool: get_product_groups()
-Returns: List of {id, name, ...}
-```
-
-Update `product_groups` to match the groups configured in Grocy.
+- Map each location to an entry in `inventory_locations`, filling in `grocy_location_id` with the actual ID.
+- Update `quantity_units.common_units` with the actual units available in the instance.
+- Update `product_groups` to match the groups configured in Grocy.
 
 ## How Other Skills Use This Profile
 
@@ -223,13 +209,13 @@ Always confirm changes before applying them — the profile affects how all othe
 
 When the user first sets up their profile, guide them through it conversationally:
 
-1. **Locations**: "Let me discover your Grocy locations..." → `get_locations()` → "I found [Refrigerator, Freezer, Pantry]. Does this match your setup?"
+1. **Locations**: "Let me discover your Grocy locations..." → `get_master_data()` → "I found [Refrigerator, Freezer, Pantry]. Does this match your setup?"
 
 2. **Units**: "What units do you typically use for groceries? Grams and milliliters, or pounds and cups?"
 
 3. **Dietary needs**: "Any dietary restrictions or allergies I should know about?"
 
-4. **Product groups**: "Let me check your product groups..." → `get_product_groups()` → "I see [Dairy, Meat, ...]. Want me to set typical locations for each?"
+4. **Product groups**: "Let me check your product groups..." → the `product_groups` from `get_master_data()` → "I see [Dairy, Meat, ...]. Want me to set typical locations for each?"
 
 5. **Custom rules**: "Any special preferences? For example, 'always use up expiring items first' or 'suggest vegetarian options on weekdays'."
 

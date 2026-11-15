@@ -2,7 +2,7 @@
 Lookup tools for Grocy MCP server.
 
 Provides foundational tools for searching and listing Grocy entities:
-products, locations, quantity units, and product groups.
+products, and the master data (locations, quantity units, product groups).
 """
 
 from __future__ import annotations
@@ -86,31 +86,19 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         return shaped
 
     @mcp.tool(annotations=READ_ONLY)
-    def get_locations() -> list[dict[str, Any]]:
+    def get_master_data() -> dict[str, list[dict[str, Any]]]:
         """
-        List all storage locations in Grocy.
+        List the storage locations, quantity units and product groups.
+
+        Use it to discover the exact names and IDs other tools accept.
 
         Returns:
-            List of locations with id, name, description, and is_freezer flag.
+            {locations, quantity_units, product_groups}. Locations carry id,
+            name, description and is_freezer; quantity units id, name,
+            name_plural and description; product groups id, name and
+            description.
         """
-        return client.get("/api/objects/locations")
-
-    @mcp.tool(annotations=READ_ONLY)
-    def get_quantity_units() -> list[dict[str, Any]]:
-        """
-        List all quantity units (e.g., grams, ml, cups).
-
-        Returns:
-            List of units with id, name, name_plural, description.
-        """
-        return client.get("/api/objects/quantity_units")
-
-    @mcp.tool(annotations=READ_ONLY)
-    def get_product_groups() -> list[dict[str, Any]]:
-        """
-        List all product categories/groups.
-
-        Returns:
-            List of product groups with id, name, description.
-        """
-        return client.get("/api/objects/product_groups")
+        return {
+            kind: client.get(f"/api/objects/{kind}")
+            for kind in ("locations", "quantity_units", "product_groups")
+        }
