@@ -39,7 +39,7 @@ All interactions with Grocy go through MCP tools — never call raw API endpoint
 
 ### Stock Queries
 
-- `get_stock(location_name=..., location_id=...)` — list what is in stock, optionally filtered by location. Returns one flat row per product and location: `product_id`, `product_name`, `location_id`, `location_name`, `amount` (summed over the stock entries), `amount_opened`, `best_before_date` (the earliest), `qu_id` and `unit_name`. With a location filter that is one row per product; without it, a product stored in two locations appears twice.
+- `get_stock(location_name=..., product_name=..., product_group_name=...)` — list what is in stock, optionally filtered by location, product and product group (each by name or `*_id`; the filters combine). Use the product filter for "how much milk do I have?" and the product group filter for "what dairy do I have?". Returns one flat row per product and location: `product_id`, `product_name`, `location_id`, `location_name`, `amount` (summed over the stock entries), `amount_opened`, `best_before_date` (the earliest), `qu_id` and `unit_name`. With a location filter that is one row per product; without it, a product stored in two locations appears twice.
 - `get_volatile_stock()` — identify products that are expiring soon, already expired, or below minimum stock. **Use this for "what's about to expire?" queries.**
 
 ### Stock Operations

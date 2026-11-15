@@ -23,16 +23,32 @@ log = logging.getLogger("grocy_mcp")
 
 
 def _stock_rows(
-    client: GrocyClient, entries: list[dict[str, Any]]
+    client: GrocyClient,
+    entries: list[dict[str, Any]],
+    *,
+    product_id: int | None = None,
+    product_group_id: int | None = None,
 ) -> list[dict[str, Any]]:
     """Sum stock entries into one flat row per product and location.
 
     amount_opened sums the opened entries; best_before_date is the earliest
-    one. qu_id is the product's stock unit.
+    one. qu_id is the product's stock unit. product_id and product_group_id
+    keep only the entries of that product or product group.
     """
+    if product_id is not None:
+        entries = [e for e in entries if int(e["product_id"]) == product_id]
     if not entries:
         return []
     products = {p["id"]: p for p in client.get("/api/objects/products")}
+    if product_group_id is not None:
+        entries = [
+            e
+            for e in entries
+            if products.get(e["product_id"], {}).get("product_group_id")
+            == product_group_id
+        ]
+        if not entries:
+            return []
     location_names = names_by_id(client.get("/api/objects/locations"))
     unit_names = names_by_id(client.get("/api/objects/quantity_units"))
 
@@ -66,22 +82,38 @@ def _stock_rows(
     return list(rows.values())
 
 
+def _int_or_none(value: Any) -> int | None:
+    return None if value is None else int(value)
+
+
 def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register inventory management tools."""
 
     @mcp.tool(annotations=READ_ONLY)
     def get_stock(
-        location_name: str = "", location_id: int | None = None
+        location_name: str = "",
+        location_id: int | None = None,
+        product_name: str = "",
+        product_id: int | None = None,
+        product_group_name: str = "",
+        product_group_id: int | None = None,
     ) -> list[dict[str, Any]] | dict[str, Any]:
         """
         Get current stock in the pantry.
 
-        Optionally filter by location (either name or ID).
+        Optionally filter by location, product and product group, each by name
+        or ID. The filters combine.
 
         Args:
             location_name: Storage location name (e.g., "Fridge", "Freezer")
             location_id: Storage location ID; if given with location_name, both
                          must name the same location
+            product_name: Product name
+            product_id: Product ID; if given with product_name, both must name
+                        the same product
+            product_group_name: Product group name (e.g., "Dairy")
+            product_group_id: Product group ID; if given with
+                              product_group_name, both must name the same group
 
         Returns:
             One row per product and location with product_id, product_name,
@@ -95,13 +127,33 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         )
         if not resolved_location["ok"]:
             return resolution_error(resolved_location)
+        resolved_product = resolve_object(
+            client, "products", product_name, product_id, entity_label="product"
+        )
+        if not resolved_product["ok"]:
+            return resolution_error(resolved_product)
+        resolved_group = resolve_object(
+            client,
+            "product_groups",
+            product_group_name,
+            product_group_id,
+            entity_label="product group",
+        )
+        if not resolved_group["ok"]:
+            return resolution_error(resolved_group)
+
         if resolved_location["id"] is not None:
             raw = client.get(
                 f"/api/stock/locations/{int(resolved_location['id'])}/entries"
             )
-            return _stock_rows(client, raw)
-
-        return _stock_rows(client, client.get("/api/objects/stock"))
+        else:
+            raw = client.get("/api/objects/stock")
+        return _stock_rows(
+            client,
+            raw,
+            product_id=_int_or_none(resolved_product["id"]),
+            product_group_id=_int_or_none(resolved_group["id"]),
+        )
 
     @mcp.tool(annotations=READ_ONLY)
     def get_volatile_stock() -> dict[str, Any]:

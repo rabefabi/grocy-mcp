@@ -157,3 +157,94 @@ class TestGrocyStockMCP:
         finally:
             if product_id is not None:
                 api_delete(f"/api/objects/products/{product_id}")
+
+
+class TestGetStockFilters:
+    @pytest.mark.asyncio
+    async def test_filters_by_product_and_product_group(
+        self,
+        call_tool,
+        client,
+        api_get,
+        api_post,
+        api_delete,
+        create_product_api,
+        name_factory,
+    ):
+        locations = api_get("/api/objects/locations")
+        if len(locations) < 2:
+            pytest.skip("Two storage locations required; seed data required")
+        main, other = locations[0], locations[1]
+        group_name = name_factory("stock-group")
+        grouped_name = name_factory("grouped")
+        loose_name = name_factory("loose")
+        group_id = grouped_id = loose_id = None
+
+        try:
+            group_id = int(
+                api_post("/api/objects/product_groups", {"name": group_name})[
+                    "created_object_id"
+                ]
+            )
+            grouped_id = int(create_product_api(grouped_name)["id"])
+            loose_id = int(create_product_api(loose_name)["id"])
+            client.put(
+                f"/api/objects/products/{grouped_id}",
+                json={"product_group_id": group_id},
+            ).raise_for_status()
+            for product_id, location in (
+                (grouped_id, main),
+                (grouped_id, other),
+                (loose_id, main),
+            ):
+                purchase = await call_tool(
+                    "purchase_product",
+                    product_id=product_id,
+                    amount=1.0,
+                    location_id=int(location["id"]),
+                )
+                assert purchase.get("status") == "success", purchase
+
+            def mine(rows):
+                return sorted(
+                    (r["product_name"], r["location_name"])
+                    for r in rows
+                    if r["product_id"] in (grouped_id, loose_id)
+                )
+
+            by_product = await call_tool("get_stock", product_name=loose_name)
+            assert mine(by_product) == [(loose_name, main["name"])]
+            assert {r["product_id"] for r in by_product} == {loose_id}
+
+            by_id = await call_tool("get_stock", product_id=grouped_id)
+            assert mine(by_id) == sorted(
+                [(grouped_name, main["name"]), (grouped_name, other["name"])]
+            )
+
+            by_group = await call_tool("get_stock", product_group_name=group_name)
+            assert {r["product_id"] for r in by_group} == {grouped_id}
+            assert len(by_group) == 2
+
+            by_group_id = await call_tool("get_stock", product_group_id=group_id)
+            assert by_group_id == by_group
+
+            group_and_location = await call_tool(
+                "get_stock", product_group_id=group_id, location_id=int(other["id"])
+            )
+            assert mine(group_and_location) == [(grouped_name, other["name"])]
+
+            product_and_group = await call_tool(
+                "get_stock", product_id=loose_id, product_group_id=group_id
+            )
+            assert product_and_group == []
+
+            unknown = await call_tool(
+                "get_stock", product_group_name="Zzqx Vwyk"
+            )
+            assert set(unknown) == {"error", "matches", "suggestion"}
+        finally:
+            for product_id in (grouped_id, loose_id):
+                if product_id is not None:
+                    api_delete(f"/api/objects/products/{product_id}")
+            if group_id is not None:
+                api_delete(f"/api/objects/product_groups/{group_id}")

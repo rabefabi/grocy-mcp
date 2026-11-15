@@ -11,6 +11,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 - `get_meal_plan` returns the recipe name and product name next to their IDs.
 - `get_products` returns the location, product group, parent product and unit names next to their IDs.
+- `get_stock` filters by product and by product group, by name or ID, alone or combined with the location filter.
 
 ### Changed
 
