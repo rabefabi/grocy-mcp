@@ -12,12 +12,17 @@ a change in `X` adds features or contains breaking changes, so read it first.
 - `get_meal_plan` returns the recipe name and product name next to their IDs.
 - `get_products` returns the location, product group, parent product and unit names next to their IDs.
 - `get_stock` filters by product and by product group, by name or ID, alone or combined with the location filter.
+- `get_stock(status="expiring")` and `get_stock(status="expired")` list the products Grocy reports as due soon, or as overdue or expired, in the same rows as every other `get_stock` call.
 
 ### Changed
 
 - Tools that take a name and an ID for the same product, location, unit or recipe return an error with the candidate matches when both are passed and the name does not resolve uniquely to that ID. Before, the ID won silently.
 - `get_stock` returns one flat row per product and location, with product, location and unit names. Stock entries in the same location are summed and report the earliest best-before date, which makes the response much smaller. Purchase dates, notes, the best-before date of each single entry, the minimum stock amount and amounts summed over sub-products are no longer returned.
 - `get_stock` returns `{total, items}` instead of a bare list, sorted by product name, and pages with `limit` and `offset`. `total` counts the matching rows before paging.
+
+### Removed
+
+- `get_volatile_stock`: use `get_stock(status="expiring")` or `get_stock(status="expired")`. Products below their minimum stock amount are no longer listed.
 
 ### Fixed
 

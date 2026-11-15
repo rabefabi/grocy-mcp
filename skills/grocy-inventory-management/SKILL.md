@@ -40,7 +40,7 @@ All interactions with Grocy go through MCP tools — never call raw API endpoint
 ### Stock Queries
 
 - `get_stock(location_name=..., product_name=..., product_group_name=...)` — list what is in stock, optionally filtered by location, product and product group (each by name or `*_id`; the filters combine). Use the product filter for "how much milk do I have?" and the product group filter for "what dairy do I have?". Returns `{total, items}`, sorted by product name; `limit` and `offset` page through the rows, and `total` counts all matching rows, so `total` larger than `len(items)` means there are more pages. Each item is one flat row per product and location: `product_id`, `product_name`, `location_id`, `location_name`, `amount` (summed over the stock entries), `amount_opened`, `best_before_date` (the earliest), `qu_id` and `unit_name`. With a location filter that is one row per product; without it, a product stored in two locations appears twice.
-- `get_volatile_stock()` — identify products that are expiring soon, already expired, or below minimum stock. **Use this for "what's about to expire?" queries.**
+- `get_stock(status="expiring")` / `get_stock(status="expired")` — the same rows, limited to products Grocy reports as due soon, or as past their best-before or expiration date. **Use this for "what's about to expire?" queries.**
 
 ### Stock Operations
 
@@ -77,7 +77,7 @@ Example response format:
   - Broccoli: 1 head (expires Apr 16)
 ```
 
-For "what's expiring soon?" queries, use `get_volatile_stock()` instead and focus on the expiring items.
+For "what's expiring soon?" queries, use `get_stock(status="expiring")` (and `status="expired"` for what is already past its date).
 
 ## Workflow: Log a Grocery Haul
 
@@ -179,8 +179,8 @@ get_stock(location_name="Refrigerator")  # Confirm item appears
 # After consumption
 get_stock()  # Confirm amount decreased or item removed
 
-# Check volatile items
-get_volatile_stock()  # Confirm expiring items flagged correctly
+# Check expiring items
+get_stock(status="expiring")  # Confirm expiring items flagged correctly
 ```
 
 ## Common Query Patterns
@@ -190,7 +190,8 @@ get_volatile_stock()  # Confirm expiring items flagged correctly
 | "What's in my fridge?" | `get_stock(location_name="Refrigerator")` |
 | "What's in my freezer?" | `get_stock(location_name="Freezer")` |
 | "Show me everything" | `get_stock()` (no filter) |
-| "What's about to expire?" | `get_volatile_stock()` |
+| "What's about to expire?" | `get_stock(status="expiring")` |
+| "What has gone off?" | `get_stock(status="expired")` |
 | "I bought groceries" | Multiple `purchase_product()` calls |
 | "I used [item]" | `consume_product(product_name="[item]")` |
 | "I threw out [item]" | `consume_product(product_name="[item]", spoiled=True)` |

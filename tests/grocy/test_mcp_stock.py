@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -293,4 +294,46 @@ class TestGetStockPaging:
             assert [r["product_name"] for r in narrowed["items"]] == [names[1]]
         finally:
             for product_id in product_ids:
+                api_delete(f"/api/objects/products/{product_id}")
+
+
+class TestGetStockStatus:
+    @pytest.mark.asyncio
+    async def test_expiring_and_expired(
+        self, call_tool, api_delete, create_product_api, name_factory
+    ):
+        today = date.today()
+        dates = {
+            "expiring": (today + timedelta(days=1)).isoformat(),
+            "expired": (today - timedelta(days=1)).isoformat(),
+            "fresh": (today + timedelta(days=300)).isoformat(),
+        }
+        product_ids: dict[str, int] = {}
+
+        try:
+            for kind, best_before in dates.items():
+                product_id = int(create_product_api(name_factory(kind))["id"])
+                product_ids[kind] = product_id
+                purchase = await call_tool(
+                    "purchase_product",
+                    product_id=product_id,
+                    amount=1.0,
+                    best_before_date=best_before,
+                )
+                assert purchase.get("status") == "success", purchase
+
+            everything = await call_tool("get_stock")
+            row_keys = set(everything["items"][0])
+            mine = set(product_ids.values())
+
+            for status in ("expiring", "expired"):
+                result = await call_tool("get_stock", status=status)
+                found = {r["product_id"] for r in result["items"]} & mine
+                assert found == {product_ids[status]}, status
+                assert all(set(r) == row_keys for r in result["items"])
+
+            with pytest.raises(Exception, match="status"):
+                await call_tool("get_stock", status="fresh")
+        finally:
+            for product_id in product_ids.values():
                 api_delete(f"/api/objects/products/{product_id}")

@@ -8,7 +8,7 @@ transferring items between storage locations.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from ..utils.annotations import READ_ONLY, WRITE
 from ..utils.resolve import resolution_error, resolve_by_name, resolve_object
@@ -21,6 +21,12 @@ if TYPE_CHECKING:
 
 log = logging.getLogger("grocy_mcp")
 
+# Lists of /api/stock/volatile that make up each get_stock status.
+_VOLATILE_LISTS = {
+    "expiring": ("due_products",),
+    "expired": ("overdue_products", "expired_products"),
+}
+
 
 def _stock_rows(
     client: GrocyClient,
@@ -28,15 +34,19 @@ def _stock_rows(
     *,
     product_id: int | None = None,
     product_group_id: int | None = None,
+    product_ids: set[int] | None = None,
 ) -> list[dict[str, Any]]:
     """Sum stock entries into one flat row per product and location.
 
     amount_opened sums the opened entries; best_before_date is the earliest
-    one. qu_id is the product's stock unit. product_id and product_group_id
-    keep only the entries of that product or product group.
+    one. qu_id is the product's stock unit. product_id, product_group_id and
+    product_ids keep only the entries of that product, product group or
+    set of products.
     """
     if product_id is not None:
         entries = [e for e in entries if int(e["product_id"]) == product_id]
+    if product_ids is not None:
+        entries = [e for e in entries if int(e["product_id"]) in product_ids]
     if not entries:
         return []
     products = {p["id"]: p for p in client.get("/api/objects/products")}
@@ -97,6 +107,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         product_id: int | None = None,
         product_group_name: str = "",
         product_group_id: int | None = None,
+        status: Literal["expiring", "expired"] | None = None,
         limit: int | None = None,
         offset: int = 0,
     ) -> dict[str, Any]:
@@ -104,8 +115,8 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         Get current stock in the pantry.
 
         Optionally filter by location, product and product group, each by name
-        or ID. The filters combine. Rows are sorted by product name; limit and
-        offset page through them.
+        or ID, and by expiry status. The filters combine. Rows are sorted by
+        product name; limit and offset page through them.
 
         Args:
             location_name: Storage location name (e.g., "Fridge", "Freezer")
@@ -117,6 +128,9 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             product_group_name: Product group name (e.g., "Dairy")
             product_group_id: Product group ID; if given with
                               product_group_name, both must name the same group
+            status: "expiring" for products Grocy reports as due soon,
+                    "expired" for products past their best-before or
+                    expiration date. Use this for "what should we use up?"
             limit: Maximum number of rows to return; all rows if omitted
             offset: Number of rows to skip before the first returned row
 
@@ -156,11 +170,20 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             )
         else:
             raw = client.get("/api/objects/stock")
+        product_ids = None
+        if status is not None:
+            volatile = client.get("/api/stock/volatile")
+            product_ids = {
+                int(entry["product_id"])
+                for key in _VOLATILE_LISTS[status]
+                for entry in volatile.get(key) or []
+            }
         rows = _stock_rows(
             client,
             raw,
             product_id=_int_or_none(resolved_product["id"]),
             product_group_id=_int_or_none(resolved_group["id"]),
+            product_ids=product_ids,
         )
         rows.sort(
             key=lambda r: (
@@ -170,19 +193,6 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         )
         end = None if limit is None else offset + limit
         return {"total": len(rows), "items": rows[offset:end]}
-
-    @mcp.tool(annotations=READ_ONLY)
-    def get_volatile_stock() -> dict[str, Any]:
-        """
-        Get items that are expiring soon, overdue, or already expired.
-
-        This is useful for answering "what should we use up?" and avoiding waste.
-
-        Returns:
-            Dictionary with "due_soon", "overdue", and "expired" lists, each
-            containing stock entries grouped by urgency
-        """
-        return client.get("/api/stock/volatile")
 
     @mcp.tool(annotations=WRITE)
     def purchase_product(
