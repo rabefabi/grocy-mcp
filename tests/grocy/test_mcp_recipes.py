@@ -273,3 +273,73 @@ class TestGrocyRecipesMCP:
                 api_delete(f"/api/objects/recipes/{recipe_id}")
             if product_id is not None:
                 api_delete(f"/api/objects/products/{product_id}")
+
+
+class TestGetRecipesDetails:
+    @pytest.mark.asyncio
+    async def test_details_add_ingredients_with_names(
+        self,
+        call_tool,
+        api_get,
+        api_post,
+        api_delete,
+        create_product_api,
+        default_qu_id,
+        name_factory,
+    ):
+        prefix = name_factory("details")
+        unit_name = api_get(f"/api/objects/quantity_units/{default_qu_id}")["name"]
+        cleanup: list[str] = []
+
+        try:
+            product = create_product_api(f"{prefix}-flour")
+            cleanup.append(f"/api/objects/products/{product['id']}")
+            recipe_ids = []
+            for suffix in ("bread", "cake"):
+                recipe_id = int(
+                    api_post(
+                        "/api/objects/recipes",
+                        {
+                            "name": f"{prefix}-{suffix}",
+                            "description": f"<p>Bake the {suffix}.</p>",
+                        },
+                    )["created_object_id"]
+                )
+                recipe_ids.append(recipe_id)
+                cleanup.insert(0, f"/api/objects/recipes/{recipe_id}")
+            api_post(
+                "/api/objects/recipes_pos",
+                {
+                    "recipe_id": recipe_ids[0],
+                    "product_id": int(product["id"]),
+                    "amount": 500,
+                    "qu_id": default_qu_id,
+                    "note": "sifted",
+                },
+            )
+
+            short = await call_tool("get_recipes", query=prefix)
+            assert len(short) == 2
+            assert all("ingredients" not in r for r in short)
+
+            detailed = await call_tool("get_recipes", query=prefix, details=True)
+            by_name = {r["name"]: r for r in detailed}
+            bread = by_name[f"{prefix}-bread"]
+            assert bread["description"] == "<p>Bake the bread.</p>"
+            assert bread["ingredients"] == [
+                {
+                    "id": bread["ingredients"][0]["id"],
+                    "product_id": int(product["id"]),
+                    "product_name": f"{prefix}-flour",
+                    "amount": 500,
+                    "qu_id": default_qu_id,
+                    "unit_name": unit_name,
+                    "note": "sifted",
+                    "ingredient_group": None,
+                    "variable_amount": None,
+                }
+            ]
+            assert by_name[f"{prefix}-cake"]["ingredients"] == []
+        finally:
+            for path in cleanup:
+                api_delete(path)

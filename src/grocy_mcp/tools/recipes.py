@@ -19,7 +19,7 @@ from PIL import Image
 
 from ..utils.annotations import DESTRUCTIVE, READ_ONLY, WRITE
 from ..utils.resolve import resolve_by_name, resolve_name_and_id, resolve_object
-from ..utils.shape import shape_response
+from ..utils.shape import names_by_id, shape_response
 
 _RECIPE_KEEP = {
     "id",
@@ -29,6 +29,16 @@ _RECIPE_KEEP = {
     "desired_servings",
     "picture_file_name",
     "type",  # machine-actionable: "normal" vs "mealplan" distinguishes user recipes from Grocy-internal synthetic entries
+}
+
+_INGREDIENT_KEEP = {
+    "id",
+    "product_id",
+    "amount",
+    "qu_id",
+    "note",
+    "ingredient_group",
+    "variable_amount",
 }
 
 _FULFILLMENT_KEEP = {
@@ -285,36 +295,50 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
     """Register recipe tools."""
 
     @mcp.tool(annotations=READ_ONLY)
-    def get_recipes(query: str = "") -> list[dict[str, Any]]:
-        """Search or list recipes by name."""
+    def get_recipes(query: str = "", details: bool = False) -> list[dict[str, Any]]:
+        """
+        Search or list recipes by name.
+
+        Args:
+            query: Search term to filter recipes by name (case-insensitive).
+                   Leave empty to list all recipes.
+            details: Also return each recipe's ingredients. Narrow the query
+                     first; details for every recipe make a large response.
+
+        Returns:
+            List of recipes with id, name, description (the instructions,
+            HTML), base_servings, desired_servings, picture_file_name and type
+            ("normal" for user recipes; other types are Grocy-internal). With
+            details, each recipe also carries ingredients: id, product_id,
+            product_name, amount, qu_id, unit_name, note, ingredient_group and
+            variable_amount.
+        """
         recipes = client.get("/api/objects/recipes")
         if query:
             query_lower = query.lower()
             recipes = [
                 r for r in recipes if query_lower in str(r.get("name", "")).lower()
             ]
-        return shape_response(recipes, _RECIPE_KEEP)
+        shaped = shape_response(recipes, _RECIPE_KEEP)
+        if not details or not shaped:
+            return shaped
 
-    @mcp.tool(annotations=READ_ONLY)
-    def get_recipe_details(
-        recipe_id: int | None = None, recipe_name: str = ""
-    ) -> dict[str, Any]:
-        """Get full recipe details with ingredients and description HTML."""
-        resolved = _resolve_recipe(client, recipe_id, recipe_name)
-        if not resolved["ok"]:
-            return {
-                "status": "error",
-                "error": resolved["error"],
-                "matches": resolved.get("matches", []),
-                "suggestion": resolved.get("suggestion"),
-            }
-
-        rid = int(resolved["id"])
-        recipe = client.get(f"/api/objects/recipes/{rid}")
-        ingredients = client.get(
-            "/api/objects/recipes_pos", {"query[]": f"recipe_id={rid}"}
-        )
-        return {"status": "success", "recipe": recipe, "ingredients": ingredients}
+        by_recipe: dict[Any, list[dict[str, Any]]] = {r["id"]: [] for r in shaped}
+        product_names = names_by_id(client.get("/api/objects/products"))
+        unit_names = names_by_id(client.get("/api/objects/quantity_units"))
+        for position in client.get("/api/objects/recipes_pos"):
+            ingredients = by_recipe.get(position.get("recipe_id"))
+            if ingredients is None:
+                continue
+            ingredient = shape_response(position, _INGREDIENT_KEEP)
+            ingredient["product_name"] = product_names.get(
+                ingredient.get("product_id")
+            )
+            ingredient["unit_name"] = unit_names.get(ingredient.get("qu_id"))
+            ingredients.append(ingredient)
+        for recipe in shaped:
+            recipe["ingredients"] = by_recipe[recipe["id"]]
+        return shaped
 
     @mcp.tool(annotations=READ_ONLY)
     def get_recipes_fulfillment(

@@ -10,6 +10,7 @@ REMOVED_TOOLS = {
     "get_quantity_units",
     "get_product_groups",
     "clear_shopping_list",
+    "get_recipe_details",
 }
 
 

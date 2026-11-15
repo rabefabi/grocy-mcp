@@ -27,10 +27,9 @@ Grocy calculates recipe fulfillment server-side. The `get_recipes_fulfillment()`
 
 ### Recipe Queries
 
-- `get_recipes(query=...)` — search recipes by name. Returns basic recipe info.
+- `get_recipes(query=..., details=...)` — search recipes by name. Returns id, name, description (the instructions), servings and type. With `details=True` each recipe also carries its `ingredients` (product, amount, unit, note, group), with names next to the IDs.
 - `get_recipes_fulfillment()` — get all recipes with fulfillment status. Returns which recipes can be made with current stock.
 - `get_recipe_fulfillment(recipe_id=..., recipe_name=...)` — check fulfillment for a specific recipe. Returns ingredient-by-ingredient status.
-- `get_recipe_details(recipe_id=..., recipe_name=...)` — get full recipe details including description, servings, and ingredients.
 
 ## Workflow: "What Can I Cook Tonight?"
 
@@ -72,12 +71,11 @@ Agent: get_recipe_fulfillment(recipe_name="Pasta Carbonara")
 
 ## Workflow: "What Can I Make with [Ingredient]?"
 
-1. Call `get_recipes_fulfillment()` to get all recipes
-2. For each recipe, call `get_recipe_details()` to get ingredients
-3. Filter for recipes containing the specified ingredient
-4. Sort by fulfillment status (fully stocked first)
+1. Call `get_recipes(details=True)` to get all recipes with their ingredients in one call
+2. Filter for recipes whose ingredients contain the specified product
+3. Call `get_recipes_fulfillment()` and sort by fulfillment status (fully stocked first)
 
-**Note:** Grocy doesn't have a direct "recipes by ingredient" endpoint, so this approach requires fetching all recipes first. For large recipe collections, consider caching or limiting the search.
+**Note:** Grocy doesn't have a direct "recipes by ingredient" endpoint, so this approach fetches all recipes. For large recipe collections, narrow `query` first.
 
 ## Workflow: Check Specific Recipe
 
@@ -149,7 +147,8 @@ For multiple recipes:
 | "Find pasta recipes" | `get_recipes(query="pasta")` |
 | "Can I make carbonara?" | `get_recipe_fulfillment(recipe_name="Carbonara")` |
 | "Show me vegetarian options" | `get_recipes_fulfillment()` → client-side filter |
-| "Recipes using chicken" | `get_recipes_fulfillment()` → check each for "chicken" |
+| "Recipes using chicken" | `get_recipes(details=True)` → check ingredients for "chicken" |
+| "Show me the carbonara recipe" | `get_recipes(query="Carbonara", details=True)` |
 | "Quick recipes" | `get_recipes(query="quick")` or filter by name/desc |
 
 ## Error Handling
@@ -178,6 +177,5 @@ Present the matches and let the user choose.
 ## Performance Considerations
 
 - `get_recipes_fulfillment()` is the most efficient for "what can I cook" queries
-- Avoid calling `get_recipe_details()` for every recipe in a large list
-- Cache recipe details when presenting multiple options
+- `get_recipes(details=True)` without a `query` returns every recipe with its ingredients; narrow the query when you only need a few
 - For ingredient-based search, consider limiting to top N recipes by fulfillment
