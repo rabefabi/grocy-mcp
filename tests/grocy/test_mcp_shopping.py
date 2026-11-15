@@ -45,17 +45,14 @@ class TestGrocyShoppingMCP:
             product = create_product_api(product_name)
             product_id = int(product["id"])
 
-            recipe = await call_tool("create_recipe", name=recipe_name, servings=1)
+            recipe = await call_tool(
+                "create_recipe",
+                name=recipe_name,
+                servings=1,
+                ingredients=[{"product_id": product_id, "amount": 4.0}],
+            )
             assert recipe.get("status") == "success", recipe
             recipe_id = int(recipe["recipe"]["id"])
-
-            ingredient = await call_tool(
-                "add_recipe_ingredient",
-                recipe_id=recipe_id,
-                product_id=product_id,
-                amount=4.0,
-            )
-            assert ingredient.get("status") == "success", ingredient
 
             recipes = await call_tool("get_recipes")
             assert any(int(r.get("id")) == recipe_id for r in recipes), recipes

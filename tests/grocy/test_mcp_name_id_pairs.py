@@ -198,25 +198,33 @@ class TestUnitPair:
         recipe_id = int(recipe["created_object_id"])
         try:
             mismatch = await call_tool(
-                "add_recipe_ingredient",
+                "add_recipe_ingredients",
                 recipe_id=recipe_id,
-                amount=1.0,
-                product_id=product_id,
-                qu_id=qu_id,
-                unit_name=other_unit["name"],
+                ingredients=[
+                    {
+                        "amount": 1.0,
+                        "product_id": product_id,
+                        "qu_id": qu_id,
+                        "unit_name": other_unit["name"],
+                    }
+                ],
             )
-            _assert_mismatch(mismatch)
+            _assert_mismatch(mismatch["results"][0])
             assert not api_get(
                 "/api/objects/recipes_pos", params={"query[]": f"recipe_id={recipe_id}"}
             )
 
             match = await call_tool(
-                "add_recipe_ingredient",
+                "add_recipe_ingredients",
                 recipe_id=recipe_id,
-                amount=1.0,
-                product_id=product_id,
-                qu_id=qu_id,
-                unit_name=unit["name"],
+                ingredients=[
+                    {
+                        "amount": 1.0,
+                        "product_id": product_id,
+                        "qu_id": qu_id,
+                        "unit_name": unit["name"],
+                    }
+                ],
             )
             assert match.get("status") == "success", match
         finally:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 
 RECIPE_NOISE = {"row_created_timestamp", "not_check_shoppinglist", "product_id"}
@@ -253,17 +255,10 @@ class TestGrocyRecipesMCP:
                 name=recipe_name,
                 description="Created by integration test",
                 servings=2,
+                ingredients=[{"product_id": product_id, "amount": 2.0}],
             )
             assert recipe.get("status") == "success", recipe
             recipe_id = int(recipe["recipe"]["id"])
-
-            ingredient = await call_tool(
-                "add_recipe_ingredient",
-                recipe_id=recipe_id,
-                product_id=product_id,
-                amount=2.0,
-            )
-            assert ingredient.get("status") == "success", ingredient
 
             fulfillment = await call_tool("get_recipe_fulfillment", recipe_id=recipe_id)
             assert isinstance(fulfillment, dict)
@@ -343,3 +338,73 @@ class TestGetRecipesDetails:
         finally:
             for path in cleanup:
                 api_delete(path)
+
+
+class TestCreateRecipeWithIngredients:
+    @pytest.mark.asyncio
+    async def test_creates_recipe_and_reports_unconfident_matches(
+        self,
+        call_tool,
+        api_get,
+        api_delete,
+        create_product_api,
+        default_qu_id,
+        name_factory,
+    ):
+        # Short names: a long shared prefix would make any two names similar.
+        tag = uuid4().hex[:4]
+        cleanup: list[str] = []
+
+        try:
+            breast = create_product_api(f"Zucchetto blossom {tag}")
+            stock = create_product_api(f"Zucchetto pickle {tag}")
+            cleanup += [
+                f"/api/objects/products/{breast['id']}",
+                f"/api/objects/products/{stock['id']}",
+            ]
+
+            result = await call_tool(
+                "create_recipe",
+                name=name_factory("one-call"),
+                servings=2,
+                ingredients=[
+                    {
+                        "product_name": f"zucchetto blossom {tag}",
+                        "amount": 300,
+                        "qu_id": default_qu_id,
+                    },
+                    {"product_id": int(stock["id"]), "amount": 1, "note": "hot"},
+                    {"product_name": f"Zucchetto {tag}", "amount": 2},
+                ],
+            )
+            recipe_id = int(result["recipe_id"])
+            cleanup.insert(0, f"/api/objects/recipes/{recipe_id}")
+
+            assert result["status"] == "partial_success", result
+            assert (result["total"], result["succeeded"], result["failed"]) == (3, 2, 1)
+            failed = result["results"][2]
+            assert failed["status"] == "error"
+            assert failed["error"]
+            assert {m["id"] for m in failed["matches"]} >= {
+                int(breast["id"]),
+                int(stock["id"]),
+            }
+
+            positions = api_get(
+                "/api/objects/recipes_pos", params={"query[]": f"recipe_id={recipe_id}"}
+            )
+            assert sorted((int(p["product_id"]), p["amount"]) for p in positions) == sorted(
+                [(int(breast["id"]), 300), (int(stock["id"]), 1)]
+            )
+        finally:
+            for path in cleanup:
+                api_delete(path)
+
+    @pytest.mark.asyncio
+    async def test_without_ingredients_creates_only_the_recipe(
+        self, call_tool, api_delete, name_factory
+    ):
+        result = await call_tool("create_recipe", name=name_factory("bare"))
+        api_delete(f"/api/objects/recipes/{int(result['recipe_id'])}")
+        assert result["status"] == "success", result
+        assert result["total"] == 0

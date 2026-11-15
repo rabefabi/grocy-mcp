@@ -157,32 +157,35 @@ def test_reject_low_confidence_location_match() -> None:
 
 
 @pytest.mark.asyncio
-async def test_add_recipe_ingredient_rejects_missing_product(
+async def test_add_recipe_ingredients_rejects_missing_product(
     client: FakeGrocyClient, mcp: FastMCP
 ) -> None:
-    result = await call_tool(mcp, "add_recipe_ingredient", recipe_id=1, amount=2)
+    result = await call_tool(
+        mcp, "add_recipe_ingredients", recipe_id=1, ingredients=[{"amount": 2}]
+    )
 
-    assert result["status"] == "error"
-    assert "Either product_id or product_name is required" in result["error"]
+    assert result["results"][0]["status"] == "error"
+    assert "Either product_id or product_name is required" in (
+        result["results"][0]["error"]
+    )
     assert client.recipe_positions == []
 
 
 @pytest.mark.asyncio
-async def test_add_recipe_ingredient_rejects_incompatible_unit(
+async def test_add_recipe_ingredients_rejects_incompatible_unit(
     client: FakeGrocyClient, mcp: FastMCP
 ) -> None:
     result = await call_tool(
         mcp,
-        "add_recipe_ingredient",
+        "add_recipe_ingredients",
         recipe_id=1,
-        amount=2,
-        product_id=1,
-        unit_name="Stück",
+        ingredients=[{"amount": 2, "product_id": 1, "unit_name": "Stück"}],
     )
 
-    assert result["status"] == "error"
-    assert "does not allow unit_id 2" in result["error"]
-    assert result["valid_units"] == [{"qu_id": 1, "name": "g"}]
+    failed = result["results"][0]
+    assert failed["status"] == "error"
+    assert "does not allow unit_id 2" in failed["error"]
+    assert failed["valid_units"] == [{"qu_id": 1, "name": "g"}]
     assert client.recipe_positions == []
 
 

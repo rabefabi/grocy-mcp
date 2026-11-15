@@ -10,8 +10,6 @@ from __future__ import annotations
 import base64
 import io
 import logging
-import re
-from difflib import SequenceMatcher
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -86,14 +84,38 @@ def _resolve_recipe(
     )
 
 
+def _match_product(client: GrocyClient, product_name: str) -> dict[str, Any]:
+    """Match an ingredient's product name to a Grocy product.
+
+    Only a confident match (the exact name, or a near-identical spelling)
+    resolves. A partial match such as "chicken" for "Chicken stock" returns
+    ok False with the candidate matches, so the caller chooses.
+    """
+    resolved = resolve_by_name(
+        client.get("/api/objects/products"), product_name, entity_label="product"
+    )
+    if resolved["ok"] and resolved["confidence"] != "high":
+        return {
+            **resolved,
+            "ok": False,
+            "id": None,
+            "name": None,
+            "error": f"No confident product match for '{product_name}'",
+            "suggestion": (
+                "Choose one of the matches and pass its product_id, "
+                "or create the product first"
+            ),
+        }
+    return resolved
+
+
 def _resolve_product(
     client: GrocyClient, product_id: int | None, product_name: str
 ) -> dict[str, Any]:
-    return resolve_object(
-        client,
-        "products",
+    return resolve_name_and_id(
         product_name,
         product_id,
+        lambda name: _match_product(client, name),
         entity_label="product",
         required=True,
     )
@@ -125,25 +147,6 @@ def _resolve_unit_name(client: GrocyClient, unit_name: str) -> dict[str, Any]:
         return {"ok": True, "id": int(exact[0]["id"]), "name": exact[0].get("name")}
 
     return resolve_by_name(units, normalized, entity_label="quantity unit")
-
-
-def _parse_ingredient_text(ingredient_text: str) -> dict[str, Any]:
-    pattern = re.compile(
-        r"^\s*(?P<amount>\d+(?:[\.,]\d+)?)?\s*(?P<unit>\w+)?\s*(?P<food>.+?)\s*$"
-    )
-    match = pattern.match(ingredient_text)
-    if not match:
-        return {"amount": None, "unit": None, "food": ingredient_text.strip()}
-
-    amount_raw = match.group("amount")
-    amount = float(amount_raw.replace(",", ".")) if amount_raw else None
-    unit = match.group("unit")
-    food = (match.group("food") or "").strip()
-    return {"amount": amount, "unit": unit.lower() if unit else None, "food": food}
-
-
-def _similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a.strip().lower(), b.strip().lower()).ratio()
 
 
 def _validate_unit_compatibility(
@@ -266,6 +269,59 @@ def _add_single_ingredient(
     except Exception as exc:
         log.error("Failed to add recipe ingredient: %s", exc)
         return {"status": "error", "error": str(exc)}
+
+
+def _add_ingredients(
+    client: GrocyClient, recipe_id: int, ingredients: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Add ingredient positions one by one and report the result of each."""
+    results = []
+    succeeded = 0
+
+    for ingredient in ingredients:
+        if not isinstance(ingredient, dict):
+            results.append(
+                {
+                    "status": "error",
+                    "ingredient": ingredient,
+                    "error": "Ingredient entries must be objects",
+                }
+            )
+            continue
+
+        qu_id = ingredient.get("qu_id")
+        if isinstance(qu_id, str):
+            try:
+                qu_id = int(qu_id)
+            except ValueError:
+                qu_id = None
+
+        result = _add_single_ingredient(
+            client,
+            recipe_id,
+            amount=float(ingredient.get("amount", 0)),
+            product_id=ingredient.get("product_id"),
+            product_name=str(ingredient.get("product_name", "")),
+            qu_id=qu_id,
+            unit_name=str(ingredient.get("unit_name", "")),
+            ingredient_group=str(
+                ingredient.get("ingredient_group") or ingredient.get("group") or ""
+            ),
+            note=str(ingredient.get("note", "")),
+        )
+        results.append({"ingredient": ingredient, **result})
+        if result.get("status") == "success":
+            succeeded += 1
+
+    failed = len(ingredients) - succeeded
+    return {
+        "status": "success" if failed == 0 else "partial_success",
+        "recipe_id": recipe_id,
+        "total": len(ingredients),
+        "succeeded": succeeded,
+        "failed": failed,
+        "results": results,
+    }
 
 
 def _download_image(url: str) -> bytes:
@@ -401,8 +457,29 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         description: str = "",
         servings: int = 4,
         picture_file_name: str = "",
+        ingredients: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Create a new recipe; description supports HTML content."""
+        """
+        Create a new recipe together with its ingredients.
+
+        Args:
+            name: Recipe name
+            description: Instructions; supports HTML
+            servings: Number of servings the amounts are for
+            picture_file_name: File name of an already uploaded picture
+            ingredients: Ingredient objects with amount, product_name or
+                product_id, and optionally unit_name or qu_id,
+                ingredient_group and note. A product name must match an
+                existing product exactly or nearly; otherwise that
+                ingredient is not added and its result lists the candidate
+                matches.
+
+        Returns:
+            status ("success", or "partial_success" when an ingredient
+            failed), recipe_id, recipe, and total, succeeded, failed and
+            results (one per ingredient) as add_recipe_ingredients returns
+            them. The recipe is created even when ingredients fail.
+        """
         if not name.strip():
             return {"status": "error", "error": "Recipe name is required"}
 
@@ -418,14 +495,14 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
         try:
             created = client.post("/api/objects/recipes", payload)
             recipe_id = int(created.get("created_object_id", 0))
-            return {
-                "status": "success",
-                "recipe_id": recipe_id,
-                "recipe": {"id": recipe_id, **created},
-            }
         except Exception as exc:
             log.error("Failed to create recipe '%s': %s", name, exc)
             return {"status": "error", "error": str(exc)}
+
+        return {
+            **_add_ingredients(client, recipe_id, ingredients or []),
+            "recipe": {"id": recipe_id, **created},
+        }
 
     @mcp.tool(annotations=DESTRUCTIVE)
     def update_recipe(
@@ -489,82 +566,18 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
             }
 
     @mcp.tool(annotations=WRITE)
-    def add_recipe_ingredient(
-        recipe_id: int,
-        amount: float,
-        product_id: int | None = None,
-        product_name: str = "",
-        qu_id: int | None = None,
-        unit_name: str = "",
-        ingredient_group: str = "",
-        note: str = "",
-    ) -> dict[str, Any]:
-        """Add an ingredient position to an existing recipe."""
-        return _add_single_ingredient(
-            client,
-            recipe_id,
-            amount,
-            product_id=product_id,
-            product_name=product_name,
-            qu_id=qu_id,
-            unit_name=unit_name,
-            ingredient_group=ingredient_group,
-            note=note,
-        )
-
-    @mcp.tool(annotations=WRITE)
     def add_recipe_ingredients(
         recipe_id: int,
         ingredients: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """Add multiple ingredient positions to an existing recipe in one call."""
-        results = []
-        succeeded = 0
+        """
+        Add ingredients to an existing recipe; pass a list, also for one item.
 
-        for ingredient in ingredients:
-            if not isinstance(ingredient, dict):
-                results.append(
-                    {
-                        "status": "error",
-                        "ingredient": ingredient,
-                        "error": "Ingredient entries must be objects",
-                    }
-                )
-                continue
-
-            qu_id = ingredient.get("qu_id")
-            if isinstance(qu_id, str):
-                try:
-                    qu_id = int(qu_id)
-                except ValueError:
-                    qu_id = None
-
-            result = _add_single_ingredient(
-                client,
-                recipe_id,
-                amount=float(ingredient.get("amount", 0)),
-                product_id=ingredient.get("product_id"),
-                product_name=str(ingredient.get("product_name", "")),
-                qu_id=qu_id,
-                unit_name=str(ingredient.get("unit_name", "")),
-                ingredient_group=str(
-                    ingredient.get("ingredient_group") or ingredient.get("group") or ""
-                ),
-                note=str(ingredient.get("note", "")),
-            )
-            results.append({"ingredient": ingredient, **result})
-            if result.get("status") == "success":
-                succeeded += 1
-
-        failed = len(ingredients) - succeeded
-        return {
-            "status": "success" if failed == 0 else "partial_success",
-            "recipe_id": recipe_id,
-            "total": len(ingredients),
-            "succeeded": succeeded,
-            "failed": failed,
-            "results": results,
-        }
+        Each ingredient takes the fields create_recipe describes. Returns
+        status, recipe_id, total, succeeded, failed and one result per
+        ingredient.
+        """
+        return _add_ingredients(client, recipe_id, ingredients)
 
     @mcp.tool(annotations=DESTRUCTIVE)
     def upload_recipe_image(
@@ -608,64 +621,3 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "error": str(exc),
                 "suggestion": "Verify recipe ID and image payload",
             }
-
-    @mcp.tool(annotations=READ_ONLY)
-    def match_ingredient(ingredient_text: str) -> dict[str, Any]:
-        """Parse ingredient text and suggest best matching Grocy product(s)."""
-        parsed = _parse_ingredient_text(ingredient_text)
-        food = str(parsed.get("food") or "").strip()
-        if not food:
-            return {
-                "status": "error",
-                "error": "Could not parse food name",
-                "parsed": parsed,
-            }
-
-        products = client.get("/api/objects/products")
-        matches: list[dict[str, Any]] = []
-        for product in products:
-            name = str(product.get("name", ""))
-            score = _similarity(name, food)
-            if food.lower() in name.lower() or name.lower() in food.lower():
-                score = max(score, 0.82)
-            matches.append(
-                {
-                    "product_id": product.get("id"),
-                    "name": name,
-                    "score": round(score, 3),
-                }
-            )
-
-        matches.sort(key=lambda x: x["score"], reverse=True)
-        top_matches = matches[:5]
-
-        if not top_matches:
-            return {
-                "parsed": parsed,
-                "matches": [],
-                "best_match": None,
-                "match_type": "no_match",
-                "suggestion": "Create a new product in Grocy for this ingredient",
-            }
-
-        best = top_matches[0]
-        if best["score"] >= 0.9:
-            confidence = "high"
-            match_type = "exact_match"
-        elif best["score"] >= 0.7:
-            confidence = "medium"
-            match_type = "fuzzy_match"
-        else:
-            confidence = "low"
-            match_type = "low_confidence_match"
-
-        return {
-            "parsed": parsed,
-            "matches": top_matches,
-            "best_match": {
-                "product_id": best["product_id"],
-                "name": best["name"],
-                "confidence": confidence,
-            },
-            "match_type": match_type,
-        }

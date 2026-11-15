@@ -22,7 +22,7 @@ Load the **grocy-household-profile** skill for: quantity units (to match ingredi
 ## Grocy Specifics
 
 1. **No URL import endpoint**: Must fetch and parse recipe pages manually
-2. **Separate ingredient calls**: `create_recipe()` creates the recipe, then `add_recipe_ingredient()` adds each ingredient separately
+2. **One call per recipe**: `create_recipe(..., ingredients=[...])` creates the recipe and its ingredients together
 3. **Product-based ingredients**: Ingredients reference Grocy products, not free-text food names
 4. **No steps**: Grocy recipes have a single description field, not structured steps
 
@@ -30,10 +30,9 @@ Load the **grocy-household-profile** skill for: quantity units (to match ingredi
 
 ### Recipe Creation
 
-- `create_recipe(name=..., description=..., servings=..., picture_file_name=...)` — create a new recipe. Returns the recipe ID for adding ingredients.
+- `create_recipe(name=..., description=..., servings=..., ingredients=[...])` — create a new recipe with its ingredients in one call. Each ingredient is an object with `amount`, `product_name` or `product_id`, and optionally `unit_name` or `qu_id`, `ingredient_group` and `note`. Returns `recipe_id`, `status` (`"partial_success"` if an ingredient failed), `succeeded`, `failed` and one entry per ingredient in `results`. The recipe is created even when ingredients fail.
 - `update_recipe(recipe_id=..., recipe_name=..., name=..., description=..., servings=...)` — update recipe metadata without changing ingredients or recipe ID.
-- `add_recipe_ingredient(recipe_id=..., amount=..., product_id=..., product_name=..., qu_id=..., unit_name=..., ingredient_group=..., note=...)` — add one ingredient to an existing recipe. Supports both ID and name resolution.
-- `add_recipe_ingredients(recipe_id=..., ingredients=[...])` — preferred batch tool for imports; accepts the same fields as `add_recipe_ingredient()` for each ingredient and returns per-ingredient success/failure.
+- `add_recipe_ingredients(recipe_id=..., ingredients=[...])` — add ingredients to an existing recipe later, or retry the ones that failed. Takes a list, also for a single ingredient, with the same fields as `create_recipe`.
 - `upload_recipe_image(recipe_id=..., image_url=..., image_data=...)` — add a picture to a recipe. Accepts URL or base64 data.
 
 ### Product Lookups
@@ -56,11 +55,9 @@ Load the **grocy-household-profile** skill for: quantity units (to match ingredi
    - Servings → `servings`
    - Image → `image_url`
    - Ingredients → list of (amount, unit, item)
-3. **Create recipe and ingredients**:
-   - `create_recipe(name=..., description=..., servings=...)`
-   - Prefer one batch call: `add_recipe_ingredients(recipe_id=..., ingredients=[...])`
-   - Fall back to repeated `add_recipe_ingredient()` calls only when you need to handle each ingredient interactively
-4. **Upload image**: `upload_recipe_image(recipe_id=..., image_url=...)`
+3. **Create recipe and ingredients in one call**: `create_recipe(name=..., description=..., servings=..., ingredients=[...])`
+4. **Handle failed ingredients**: for each entry in `results` with `status: "error"`, show the user the `matches`, then retry with `add_recipe_ingredients(recipe_id=..., ingredients=[...])` using the chosen `product_id`, or create the product first
+5. **Upload image**: `upload_recipe_image(recipe_id=..., image_url=...)`
 
 ### Example: Import from URL
 
@@ -86,20 +83,19 @@ Should I create this recipe?"
 User: "Yes"
 
 Agent:
-1. create_recipe(name="Pasta Carbonara", description="[instructions]", servings=4)
-   → returns recipe_id=42
-
-2. Batch-add ingredients:
-   - add_recipe_ingredients(
-       recipe_id=42,
-       ingredients=[
-         {"amount": 400, "product_name": "Spaghetti", "unit_name": "g"},
-         {"amount": 200, "product_name": "Guanciale", "unit_name": "g"},
-         {"amount": 4, "product_name": "Egg Yolks", "unit_name": "Piece"},
-         {"amount": 100, "product_name": "Pecorino Romano", "unit_name": "g"},
-         {"amount": 1, "product_name": "Black Pepper", "unit_name": "Piece", "note": "to taste"},
-       ],
-     )
+1. create_recipe(
+     name="Pasta Carbonara",
+     description="[instructions]",
+     servings=4,
+     ingredients=[
+       {"amount": 400, "product_name": "Spaghetti", "unit_name": "g"},
+       {"amount": 200, "product_name": "Guanciale", "unit_name": "g"},
+       {"amount": 4, "product_name": "Egg Yolks", "unit_name": "Piece"},
+       {"amount": 100, "product_name": "Pecorino Romano", "unit_name": "g"},
+       {"amount": 1, "product_name": "Black Pepper", "unit_name": "Piece", "note": "to taste"},
+     ],
+   )
+   → returns recipe_id=42 and one result per ingredient
 
 3. upload_recipe_image(recipe_id=42, image_url="https://example.com/image.jpg")
 
@@ -120,9 +116,7 @@ When the user provides a recipe verbally or as free text:
 
 2. **Normalize ingredients** to Grocy products
 
-3. **Create recipe and batch ingredients**:
-   - `create_recipe(name=..., description=..., servings=...)`
-   - `add_recipe_ingredients(recipe_id=..., ingredients=[...])`
+3. **Create recipe and ingredients in one call**: `create_recipe(name=..., description=..., servings=..., ingredients=[...])`
 
 ### Example: Dictated Recipe
 
@@ -146,9 +140,10 @@ A few questions:
 User: "1 can, 2 cloves garlic, a handful of basil"
 
 Agent:
-1. create_recipe(name="Quick Pasta", description="Cook the pasta, make the sauce, combine.", servings=2)
-2. add_recipe_ingredients(
-     recipe_id=43,
+create_recipe(
+     name="Quick Pasta",
+     description="Cook the pasta, make the sauce, combine.",
+     servings=2,
      ingredients=[
        {"amount": 200, "product_name": "Pasta", "unit_name": "g"},
        {"amount": 1, "product_name": "Canned Tomatoes", "unit_name": "can"},
@@ -176,8 +171,10 @@ Common patterns:
 Agent: get_products(query="pasta")
 ```
 
-If found: Use the product ID
+If found: use its exact name or product ID in the ingredient
 If not found: Offer to create it (→ grocy-product-management)
+
+`create_recipe` only accepts a product name that matches an existing product exactly or nearly. A partial match, such as "chicken" for "Chicken stock", is not added: its result has `status: "error"` and lists the candidate `matches`. Ask the user which one they meant instead of picking one yourself.
 
 ### Step 3: Match Unit
 
@@ -209,9 +206,11 @@ Which would you prefer?"
 Use `ingredient_group` to organize ingredients:
 
 ```
-add_recipe_ingredient(..., ingredient_group="For the sauce")
-add_recipe_ingredient(..., ingredient_group="For the pasta")
-add_recipe_ingredient(..., ingredient_group="To serve")
+create_recipe(..., ingredients=[
+  {..., "ingredient_group": "For the sauce"},
+  {..., "ingredient_group": "For the pasta"},
+  {..., "ingredient_group": "To serve"},
+])
 ```
 
 ## Image Upload
@@ -234,9 +233,9 @@ The tool compresses the image to JPEG automatically.
 
 | User request | Tool sequence |
 |--------------|---------------|
-| "Import [URL]" | Fetch → parse → `create_recipe()` → `add_recipe_ingredients()` |
-| "Add a recipe called X" | `create_recipe()` → `add_recipe_ingredients()` |
-| "Add [ingredient] to [recipe]" | Find recipe → `add_recipe_ingredient()` |
+| "Import [URL]" | Fetch → parse → `create_recipe(..., ingredients=[...])` |
+| "Add a recipe called X" | `create_recipe(..., ingredients=[...])` |
+| "Add [ingredient] to [recipe]" | Find recipe → `add_recipe_ingredients(recipe_id=..., ingredients=[{...}])` |
 | "Fix recipe metadata after import" | Find recipe → `update_recipe()` |
 | "Upload image for [recipe]" | Find recipe → `upload_recipe_image()` |
 

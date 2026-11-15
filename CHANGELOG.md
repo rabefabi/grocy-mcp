@@ -12,6 +12,7 @@ a change in `X` adds features or contains breaking changes, so read it first.
 - `get_meal_plan` returns the recipe name and product name next to their IDs.
 - `get_products` returns the location, product group, parent product and unit names next to their IDs.
 - `get_stock` filters by product and by product group, by name or ID, alone or combined with the location filter.
+- `create_recipe` takes `ingredients` and creates the recipe with its ingredients in one call, reporting the result of each ingredient.
 - `get_recipes(details=True)` returns each recipe with its ingredients, with product and unit names next to their IDs.
 - `get_master_data` lists locations, quantity units and product groups in one call.
 - `get_stock(status="expiring")` and `get_stock(status="expired")` list the products Grocy reports as due soon, or as overdue or expired, in the same rows as every other `get_stock` call.
@@ -20,10 +21,12 @@ a change in `X` adds features or contains breaking changes, so read it first.
 
 - Tools that take a name and an ID for the same product, location, unit or recipe return an error with the candidate matches when both are passed and the name does not resolve uniquely to that ID. Before, the ID won silently.
 - `get_stock` returns one flat row per product and location, with product, location and unit names. Stock entries in the same location are summed and report the earliest best-before date, which makes the response much smaller. Purchase dates, notes, the best-before date of each single entry, the minimum stock amount and amounts summed over sub-products are no longer returned.
+- `create_recipe` and `add_recipe_ingredients` only accept an ingredient's product name when it matches a product exactly or nearly. A partial match such as "chicken" for "Chicken stock" returns the candidate matches instead of adding the ingredient.
 - `get_stock` returns `{total, items}` instead of a bare list, sorted by product name, and pages with `limit` and `offset`. `total` counts the matching rows before paging.
 
 ### Removed
 
+- `match_ingredient` and `add_recipe_ingredient`: pass ingredients to `create_recipe`, or a list (also of one) to `add_recipe_ingredients`.
 - `get_recipe_details`: use `get_recipes(query=..., details=True)`.
 - `clear_shopping_list`: to empty the list, read it with `get_shopping_list` and remove each product with `remove_from_shopping_list`.
 - `get_locations`, `get_quantity_units` and `get_product_groups`: use `get_master_data`.

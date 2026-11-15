@@ -11,6 +11,8 @@ REMOVED_TOOLS = {
     "get_product_groups",
     "clear_shopping_list",
     "get_recipe_details",
+    "match_ingredient",
+    "add_recipe_ingredient",
 }
 
 
