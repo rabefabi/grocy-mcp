@@ -7,7 +7,7 @@ An [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server that l
 ## Features
 
 - **Inventory** — view stock by location, find expiring items, log purchases, consumption, opening and transfers
-- **Shopping list** — view, add, remove, clear, add a recipe's missing ingredients
+- **Shopping list** — view, add, remove, add a recipe's missing ingredients
 - **Recipes** — search, check fulfillment against stock, create and edit, add ingredients, upload images, consume a cooked recipe
 - **Meal plan** — view, add and remove entries
 - **Product database** — create and update products, quantity-unit conversions, Open Food Facts lookup
