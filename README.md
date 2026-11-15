@@ -86,6 +86,7 @@ just grocy-token   # write an API key to .env.grocy.test
 just grocy-seed    # load representative test data
 just grocy-test    # run the test suite (extra args are passed to pytest)
 just grocy-down    # remove the test instance
+just typecheck     # type-check src/ with pyright
 ```
 
 See [CLAUDE.md](CLAUDE.md) for project structure and conventions, and [docs/adr/](docs/adr/) for architecture decisions.

@@ -11,6 +11,7 @@
 #   just grocy-token    Generate Grocy API token → .env.grocy.test
 #   just grocy-seed     Populate Grocy with representative test data
 #   just grocy-test     Run the test suite (pass extra args to pytest)
+#   just typecheck      Type-check src/ with pyright
 #
 # First-time setup:
 #   just grocy-up
@@ -85,6 +86,10 @@ grocy-mcp-run env="dev":
         cat /tmp/grocy_mcp.log >&2
         exit 1
     fi
+
+# Type-check src/ with pyright (config in pyproject.toml)
+typecheck:
+    uv run pyright
 
 # ── Grocy test instance ───────────────────────────────────────────────────────
 # Credentials are written to .env.grocy.test (gitignored).

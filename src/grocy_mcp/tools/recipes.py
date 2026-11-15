@@ -509,7 +509,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 continue
 
             qu_id = ingredient.get("qu_id")
-            if isinstance(qu_id, str) and qu_id.strip():
+            if isinstance(qu_id, str):
                 try:
                     qu_id = int(qu_id)
                 except ValueError:

@@ -133,17 +133,16 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
 
         if stock_unit is None:
             stock_unit = fallback_unit_id
-        if purchase_unit is None:
-            purchase_unit = stock_unit
-        if consume_unit is None:
-            consume_unit = stock_unit
-
         if stock_unit is None:
             return {
                 "status": "error",
                 "error": "No quantity units available; cannot create product",
                 "suggestion": "Create at least one quantity unit in Grocy first",
             }
+        if purchase_unit is None:
+            purchase_unit = stock_unit
+        if consume_unit is None:
+            consume_unit = stock_unit
 
         if resolved_location_id is None:
             products = client.get("/api/objects/products")

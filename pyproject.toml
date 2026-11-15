@@ -17,6 +17,7 @@ Homepage = "https://github.com/rabefabi/grocy-mcp"
 
 [dependency-groups]
 dev = [
+    "pyright>=1.1.414",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.0,<2",
     "pytest-cov>=6.0",
@@ -38,3 +39,7 @@ source = ["grocy_mcp"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.13"

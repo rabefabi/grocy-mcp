@@ -130,6 +130,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "message": f"Failed to look up barcode {barcode}",
             }
         
+        assert response is not None
         try:
             data = response.json()
             
@@ -190,6 +191,7 @@ def register(mcp: FastMCP, client: GrocyClient) -> None:
                 "message": f"Failed to search for '{query}'",
             }
         
+        assert response is not None
         try:
             data = response.json()
             results = data.get("products", [])
